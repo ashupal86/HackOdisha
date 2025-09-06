@@ -17,7 +17,58 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="HackOdisha Log API",
-    description="A fast Redis-based logging API with WebSocket support",
+    description="""
+## HackOdisha Log API
+
+A fast Redis-based logging API with WebSocket support for real-time log streaming.
+
+### Features
+- 🚀 **Fast Redis Backend**: Lightning-fast operations
+- 🔐 **Authentication**: Token-based session management  
+- 🔒 **Tamper-proof**: HMAC-SHA256 hash verification
+- ⚡ **Real-time**: WebSocket streaming with Redis pub/sub
+- 📊 **Structured Logs**: user_id, query, status, timestamp, hash
+
+### WebSocket Endpoints
+Since WebSocket endpoints don't appear in standard OpenAPI docs, here's how to use them:
+
+#### 📡 Live Log Retrieval: `ws://localhost:8001/ws/logs`
+Get logs with pagination and real-time updates.
+
+**Query Parameters:**
+- `user_id` (optional): Filter logs by user
+- `limit` (optional): Number of logs to return (default: 100)
+- `offset` (optional): Offset for pagination (default: 0)
+
+**Example:**
+```javascript
+const ws = new WebSocket('ws://localhost:8001/ws/logs?user_id=test_user&limit=50');
+ws.onmessage = (event) => console.log(JSON.parse(event.data));
+```
+
+#### 🔄 Real-time Stream: `ws://localhost:8001/ws/stream`
+Real-time updates only (no initial data).
+
+**Query Parameters:**
+- `user_id` (optional): Filter updates by user
+
+**Example:**
+```javascript
+const ws = new WebSocket('ws://localhost:8001/ws/stream?user_id=test_user');
+ws.onmessage = (event) => console.log('New log:', JSON.parse(event.data));
+```
+
+### Testing WebSockets
+1. Open `websocket_test.html` in your browser for interactive testing
+2. Use `python websocket_client.py` for command-line testing
+3. Use browser dev tools console with the examples above
+
+### Message Types
+- `logs_response`: Initial logs with metadata
+- `heartbeat`: Connection keep-alive  
+- `initial_logs`: Initial batch data
+- Log entries: Real-time log updates with full log data
+    """,
     version="1.0.0",
     lifespan=lifespan
 )

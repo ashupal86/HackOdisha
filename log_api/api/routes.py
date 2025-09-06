@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import HTMLResponse
 from typing import List
 from .models import LogEntry
 from .log import LogCreate, LogResponse, LoginRequest, TokenResponse
@@ -54,4 +55,49 @@ def verify_log(log_id: str):
     return {
         "log_id": log_id,
         "verification": verification_result
+    }
+
+
+@router.get("/websocket-docs", response_class=HTMLResponse, include_in_schema=False)
+def websocket_documentation():
+    """WebSocket testing interface"""
+    with open("websocket_test.html", "r") as f:
+        return f.read()
+
+
+@router.get("/websocket-info")
+def websocket_info():
+    """Get WebSocket endpoint information"""
+    return {
+        "websocket_endpoints": {
+            "logs": {
+                "url": "ws://localhost:8001/ws/logs",
+                "description": "Live log retrieval with pagination and real-time updates",
+                "parameters": {
+                    "user_id": "Optional - Filter logs by user",
+                    "limit": "Optional - Number of logs to return (default: 100)",
+                    "offset": "Optional - Offset for pagination (default: 0)"
+                },
+                "example": "ws://localhost:8001/ws/logs?user_id=test_user&limit=50&offset=0"
+            },
+            "stream": {
+                "url": "ws://localhost:8001/ws/stream", 
+                "description": "Real-time log stream only (no initial data)",
+                "parameters": {
+                    "user_id": "Optional - Filter real-time updates by user"
+                },
+                "example": "ws://localhost:8001/ws/stream?user_id=test_user"
+            }
+        },
+        "message_types": {
+            "logs_response": "Initial logs with metadata and pagination info",
+            "heartbeat": "Connection keep-alive with connection count",
+            "initial_logs": "Initial batch data from stream endpoint",
+            "log_entry": "Real-time log updates with full log data (id, user_id, query, status, timestamp, hash)"
+        },
+        "testing": {
+            "browser": "Visit /api/v1/websocket-docs for interactive testing",
+            "javascript": "Use WebSocket API: new WebSocket('ws://localhost:8001/ws/logs')",
+            "python": "Use websocket_client.py script for command-line testing"
+        }
     }
