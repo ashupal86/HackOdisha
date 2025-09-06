@@ -96,7 +96,7 @@ graph TD
   U -->|Chat Query| Q[Query API]
   Q -->|AI Guardrails| AG[Agent Validator]
   AG -->|Pass| EX[Query Executor]
-  AG -->|Fail| RE[Return "Request Admin Approval"]
+  AG -->|Fail| RE[Return Request Admin Approval]
   EX -->|Execute Safe Query| DB
   EX -->|Log| BC[Blockchain Logger]
   RE -->|Approval Request| AD
