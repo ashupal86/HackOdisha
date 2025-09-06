@@ -14,9 +14,11 @@
     "@ai-sdk/react": "1.1.21",
     "@google/generative-ai": "^0.24.1",
     "@mastra/core": "^0.10.1",
+    "@types/pg": "^8.15.5",
     "ai": "4.2",
     "next": "15.5.2",
     "openai": "^5.19.1",
+    "pg": "^8.16.3",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },

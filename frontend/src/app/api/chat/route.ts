@@ -1,55 +1,6 @@
 import { google } from '@ai-sdk/google';
 import { Agent } from '@mastra/core/agent';
-import { generateText, tool } from 'ai';
-import { z } from 'zod';
-
-// Define tools using the AI SDK structure
-const querySafetyCheck = tool({
-  description: 'Check if a SQL query is safe and complies with security policies',
-  parameters: z.object({
-    query: z.string().describe('The SQL query to validate'),
-    userRole: z.string().optional().describe('The role of the user executing the query')
-  }),
-  execute: async ({ query, userRole = 'user' }) => {
-    // Basic safety checks
-    const dangerousOperations = ['DROP', 'DELETE', 'TRUNCATE', 'ALTER', 'CREATE', 'INSERT', 'UPDATE'];
-    const upperQuery = query.toUpperCase();
-    
-    const hasDangerousOp = dangerousOperations.some(op => upperQuery.includes(op));
-    
-    if (hasDangerousOp && userRole !== 'admin') {
-      return {
-        safe: false,
-        reason: 'Query contains operations that require admin approval',
-        recommendation: 'Request admin approval for this operation',
-        requiresApproval: true
-      };
-    }
-    
-    return {
-      safe: true,
-      reason: 'Query appears safe for execution',
-      requiresApproval: false
-    };
-  }
-});
-
-const generateSafeQuery = tool({
-  description: 'Generate a safe SQL query based on user requirements',
-  parameters: z.object({
-    requirement: z.string().describe('The user requirement or question to convert to SQL'),
-    tableContext: z.string().optional().describe('Available tables and schema information')
-  }),
-  execute: async ({ requirement }) => {
-    // This would typically connect to your database schema
-    // For now, return a template response
-    return {
-      query: `-- Safe query template for: ${requirement}\nSELECT * FROM your_table WHERE condition LIMIT 100;`,
-      explanation: 'This is a safe SELECT query that limits results and avoids modification operations.',
-      safety_notes: 'Query uses SELECT only and includes LIMIT clause for performance.'
-    };
-  }
-});
+import { generateSafeQuery, querySafetyCheck, executeQuery, generateResponse, fetchDatabaseSchema } from './tools/index';
 
 // System instructions for the AI-SafeQuery assistant
 const systemInstructions = `You are an AI assistant for AI-SafeQuery, a database query interface with governance and compliance features.
@@ -77,6 +28,15 @@ Remember: All queries go through an AI safety layer and role-based permission ch
 - Admin approval workflows
 - Interactive dashboards and analytics
 
+Always use the available tools to assist with database schema fetching, query safety checking, safe query generation, query execution, and response generation.
+
+Context: You have access to the following tools:
+- fetchDatabaseSchema: Fetches the current database schema
+- querySafetyCheck: Checks if a SQL query is safe to run
+- generateSafeQuery: Generates a safe SQL query based on user intent
+- executeQuery: Executes a SQL query against the database
+- generateResponse: Generates a user-friendly response based on query results
+
 Context: This is a governance and compliance system for database access with blockchain logging and admin approval workflows.`;
 
 // Allow streaming responses up to 30 seconds
@@ -102,20 +62,21 @@ export async function POST(req: Request) {
       );
     }
 
-
     const agent = new Agent({
       name: 'AI-SafeQuery Assistant',
-      instructions:systemInstructions,
-      tools:{
+      instructions: systemInstructions,
+      tools: {
+        fetchDatabaseSchema,
         querySafetyCheck,
-        generateSafeQuery
+        generateSafeQuery,
+        executeQuery,
+        generateResponse
       },
-      model: google('gemini-1.5-flash'),
-    })
-
+      model: google('gemini-2.5-pro'),
+    });
 
     const response = await agent.stream(messages, {
-      onFinish:async ({ usage, response: agentResponse }) =>{
+      onFinish: async ({ usage }) => {
         console.table({
           promptTokens: usage.promptTokens,
           completionTokens: usage.completionTokens,
@@ -125,9 +86,9 @@ export async function POST(req: Request) {
       onError: (err) => {
         console.error('Agent error:', err);
       }
-    })
+    });
 
-    return response.toDataStreamResponse()
+    return response.toDataStreamResponse();
 
   } catch (error) {
     console.error('Chat API error:', error);
