@@ -1,0 +1,53 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+.env.bak/
+env/
+ENV/
+.venv/
+.env
+
+# VSCode settings (optional)
+.vscode/
+
+# Mac system files
+.DS_Store
+
+# Pytest cache
+.pytest_cache/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs and local debug
+*.log
+
+# Compiled C extensions
+*.so
+
+# Test coverage reports
+htmlcov/
+.coverage
+.tox/
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+
+# MyPy and Pyright
+.mypy_cache/
+.pyright/
+
+# Pip dependency cache
+pip-wheel-metadata/
+pip-log.txt
+
+# Dist/Build files
+build/
+dist/
+*.egg-info/
