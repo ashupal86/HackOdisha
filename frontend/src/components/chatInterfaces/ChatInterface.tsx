@@ -1,10 +1,13 @@
 'use client';
 
-import { useChat } from 'ai/react';
+// import { useChat } from 'ai/react';
+import {useChat } from '@ai-sdk/react'
+
 import { useEffect, useRef, useState } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { InputField } from './InputField';
 import { UserProfile } from './UserProfile';
+import { InteractiveTool } from './InteractiveTool';
 
 export function ChatInterface() {
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
@@ -13,12 +16,13 @@ export function ChatInterface() {
       {
         id: '1',
         role: 'assistant',
-        content: 'Welcome to AI-SafeQuery! I\'m your intelligent database assistant with built-in governance and compliance features.\n\n🔐 **Safety Features Active:**\n• Role-based access control (RBAC)\n• AI-powered query validation\n• Blockchain audit logging\n• Admin approval workflow\n\nYou can ask me questions in natural language or write SQL queries. I\'ll help you query the database safely while ensuring all operations are logged and compliant.',
+        content: 'Welcome to AI-SafeQuery! I\'m your intelligent database assistant with built-in governance and compliance features.\n\n🔐 **Safety Features Active:**\n• Role-based access control (RBAC)\n• AI-powered query validation\n• Blockchain audit logging\n• Admin approval workflow\n\nYou can ask me questions in natural language or write SQL queries. I\'ll help you query the database safely while ensuring all operations are logged and compliant.\n\n💡 **Quick Commands:** Type `/` to see available interactive tools like `/dashboard`, `/analytics`, `/logs`, `/status`, and `/help`.',
       },
     ],
   });
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [interactiveTools, setInteractiveTools] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -27,7 +31,18 @@ export function ChatInterface() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, interactiveTools]);
+
+  // Handle command execution
+  const handleCommandExecuted = (command: string, content: any) => {
+    const newTool = {
+      id: `tool-${Date.now()}`,
+      command,
+      data: content,
+      timestamp: new Date()
+    };
+    setInteractiveTools(prev => [...prev, newTool]);
+  };
 
   // Mock data - in real app, this would come from your API
   const userInfo = {
@@ -88,6 +103,21 @@ export function ChatInterface() {
                 </div>
               </div>
 
+              {/* Interactive Tools History */}
+              {interactiveTools.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Recent Tools</h3>
+                  <div className="space-y-2">
+                    {interactiveTools.slice(-3).map((tool) => (
+                      <div key={tool.id} className="bg-gray-50 rounded-lg p-2 border border-gray-100">
+                        <div className="text-xs font-medium text-gray-700">{tool.command}</div>
+                        <div className="text-xs text-gray-500">{tool.timestamp.toLocaleTimeString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Recent Queries */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-3">Recent Queries</h3>
@@ -146,9 +176,16 @@ export function ChatInterface() {
         {/* Messages Container */}
         <div className="flex-1 overflow-y-auto px-6 py-8">
           <div className="max-w-4xl mx-auto">
+            {/* Interactive Tools */}
+            {interactiveTools.map((tool) => (
+              <InteractiveTool key={tool.id} data={tool.data} />
+            ))}
+
+            {/* Chat Messages */}
             {messages.map((message) => (
               <ChatMessage key={message.id} message={message} />
             ))}
+            
             {isLoading && (
               <div className="flex justify-start mb-6">
                 <div className="bg-white text-gray-800 mr-8 border border-gray-100 shadow-md max-w-[75%] rounded-2xl px-5 py-4">
@@ -163,7 +200,6 @@ export function ChatInterface() {
                   </div>
                 </div>
               </div>
-            
             )}
             <div ref={messagesEndRef} />
           </div>
@@ -177,6 +213,7 @@ export function ChatInterface() {
               handleInputChange={handleInputChange}
               handleSubmit={handleSubmit}
               isLoading={isLoading}
+              onCommandExecuted={handleCommandExecuted}
             />
           </div>
         </div>
