@@ -1,6 +1,6 @@
 import { google } from '@ai-sdk/google';
 import { Agent } from '@mastra/core/agent';
-import { generateSafeQuery, querySafetyCheck, executeQuery, generateResponse, fetchDatabaseSchema } from './tools/index';
+import { generateSafeQuery, querySafetyCheck, executeQuery, generateResponse, fetchDatabaseSchema, generateAnalyticsReport, displayAnalytics } from './tools/index';
 
 // System instructions for the AI-SafeQuery assistant
 const systemInstructions = `You are an AI assistant for AI-SafeQuery, a database query interface with governance and compliance features.
@@ -12,6 +12,7 @@ Your role is to:
 4. Provide information about role-based access control
 5. Help interpret query results
 6. Assist with the interactive dashboard and analytics tools
+7. Handle system commands like /analytics and /dashboard
 
 Key guidelines:
 - Always prioritize safety and proper permissions
@@ -21,6 +22,14 @@ Key guidelines:
 - If a user asks for potentially dangerous operations (DROP, DELETE, TRUNCATE), explain the risks and approval process
 - When users ask about system features, explain the governance, compliance, and blockchain logging capabilities
 
+Analytics Command Handling:
+- When users type /analytics [table_name] or ask for analysis of a specific table:
+  1. First use generateAnalyticsReport to fetch actual data from the specified table
+  2. Then use displayAnalytics to format the results in markdown tables
+  3. Present comprehensive analysis including data statistics, column analysis, and insights
+- Example: "/analytics products" should analyze the products table with real data
+- If no table name is provided, ask the user to specify which table they want to analyze
+
 Remember: All queries go through an AI safety layer and role-based permission checks before execution. This system features:
 - Role-based access control (RBAC)
 - AI-powered query validation
@@ -28,7 +37,7 @@ Remember: All queries go through an AI safety layer and role-based permission ch
 - Admin approval workflows
 - Interactive dashboards and analytics
 
-Always use the available tools to assist with database schema fetching, query safety checking, safe query generation, query execution, and response generation.
+Always use the available tools to assist with database operations and system reporting.
 
 Context: You have access to the following tools:
 - fetchDatabaseSchema: Fetches the current database schema
@@ -36,6 +45,8 @@ Context: You have access to the following tools:
 - generateSafeQuery: Generates a safe SQL query based on user intent
 - executeQuery: Executes a SQL query against the database
 - generateResponse: Generates a user-friendly response based on query results
+- generateAnalyticsReport: Generates comprehensive analytics by fetching actual data from a specified table
+- displayAnalytics: Formats analytics data into beautiful markdown tables and reports
 
 Context: This is a governance and compliance system for database access with blockchain logging and admin approval workflows.`;
 
@@ -70,7 +81,9 @@ export async function POST(req: Request) {
         querySafetyCheck,
         generateSafeQuery,
         executeQuery,
-        generateResponse
+        generateResponse,
+        generateAnalyticsReport,
+        displayAnalytics
       },
       model: google('gemini-2.5-pro'),
     });

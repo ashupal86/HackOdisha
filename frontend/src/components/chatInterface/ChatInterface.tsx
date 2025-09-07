@@ -7,7 +7,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChatMessage } from './ChatMessage';
 import { InputField } from './InputField';
-import { InteractiveTool } from './InteractiveTool';
 import ChatHeader from './ChatHeader';
 import DatabaseMonitoring from './DatabaseMonitoring';
 import { UserProfile } from './UserProfile';
@@ -21,12 +20,11 @@ export function ChatInterface() {
       {
         id: '1',
         role: 'assistant',
-        content: 'Welcome to AI-SafeQuery! I\'m your intelligent database assistant with built-in governance and compliance features.\n\n🔐 **Safety Features Active:**\n• Role-based access control (RBAC)\n• AI-powered query validation\n• Blockchain audit logging\n• Admin approval workflow\n\nYou can ask me questions in natural language or write SQL queries. I\'ll help you query the database safely while ensuring all operations are logged and compliant.\n\n💡 **Quick Commands:** Type `/` to see available interactive tools like `/dashboard`, `/analytics`, `/logs`, `/status`, and `/help`.',
+        content: 'Welcome to AI-SafeQuery! I\'m your intelligent database assistant with built-in governance and compliance features.\n\n🔐 **Safety Features Active:**\n• Role-based access control (RBAC)\n• AI-powered query validation\n• Blockchain audit logging\n• Admin approval workflow\n\nYou can ask me questions in natural language or write SQL queries. I\'ll help you query the database safely while ensuring all operations are logged and compliant.\n\n💡 **Quick Commands:** Type `/analytics` for system analytics or `/dashboard` for system overview. You can also use commands like `/help` for assistance.',
       },
     ],
   });
 
-  const [interactiveTools, setInteractiveTools] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -62,18 +60,7 @@ export function ChatInterface() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, interactiveTools]);
-
-  // Handle command execution
-  const handleCommandExecuted = (command: string, content: any) => {
-    const newTool = {
-      id: `tool-${Date.now()}`,
-      command,
-      data: content,
-      timestamp: new Date()
-    };
-    setInteractiveTools(prev => [...prev, newTool]);
-  };
+  }, [messages]);
 
   // Handle logout
   const handleLogout = () => {
@@ -81,7 +68,6 @@ export function ChatInterface() {
     toast.success('Logged out successfully');
     router.push('/auth/login');
   };
-
 
   // Show loading state while checking authentication
   if (!currentUser) {
@@ -110,11 +96,6 @@ export function ChatInterface() {
         {/* Messages Container */}
         <div className="flex-1 overflow-y-auto px-6 py-8">
           <div className="max-w-4xl mx-auto">
-            {/* Interactive Tools */}
-            {interactiveTools.map((tool) => (
-              <InteractiveTool key={tool.id} data={tool.data} />
-            ))}
-
             {/* Chat Messages */}
             {messages.map((message) => (
               <ChatMessage key={message.id} message={message} />
@@ -147,7 +128,6 @@ export function ChatInterface() {
               handleInputChange={handleInputChange}
               handleSubmit={handleSubmit}
               isLoading={isLoading}
-              onCommandExecuted={handleCommandExecuted}
             />
           </div>
         </div>
