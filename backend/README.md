@@ -2,6 +2,8 @@
 
 A comprehensive FastAPI backend application with JWT authentication, role-based access control (RBAC), and SQLAdmin panel.
 
+### Backend is Hosted on [Backend Link](https://hackodisha-backend-1d748d543390.herokuapp.com/)
+
 ## 🚀 Features
 
 - **FastAPI Framework**: Modern, fast, and type-safe Python web framework
