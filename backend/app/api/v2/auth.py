@@ -193,7 +193,7 @@ async def frontend_login(
         is_accessible=user.is_accessible,
         account_status=account_status,
         created_at=user.created_at.isoformat(),
-        message=status_message
+        message=status_message,
     )
     
     return FrontendLoginResponse(
