@@ -1,3 +1,4 @@
+
 // Authentication utilities for session management
 export interface UserData {
   id: string;

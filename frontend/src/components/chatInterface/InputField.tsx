@@ -7,6 +7,7 @@ interface InputFieldProps {
   handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isLoading: boolean;
   onCommandExecuted: (command: string, content: any) => void;
+  disabled?: boolean;
 }
 
 interface Command {
@@ -15,7 +16,14 @@ interface Command {
   action: () => void;
 }
 
-export function InputField({ input, handleInputChange, handleSubmit, isLoading, onCommandExecuted }: InputFieldProps) {
+export function InputField({
+  input,
+  handleInputChange,
+  handleSubmit,
+  isLoading,
+  onCommandExecuted,
+  disabled = false,
+}: InputFieldProps) {
   const [showCommands, setShowCommands] = useState(false);
   const [selectedCommand, setSelectedCommand] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -108,7 +116,7 @@ export function InputField({ input, handleInputChange, handleSubmit, isLoading, 
   ];
 
   // Filter commands based on input - show all when just "/" is typed
-  const filteredCommands = input === '/' ? commands : commands.filter(cmd => 
+  const filteredCommands = input === '/' ? commands : commands.filter(cmd =>
     cmd.command.toLowerCase().includes(input.toLowerCase()) && input.startsWith('/')
   );
 
@@ -125,12 +133,12 @@ export function InputField({ input, handleInputChange, handleSubmit, isLoading, 
     if (showCommands && filteredCommands.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setSelectedCommand(prev => 
+        setSelectedCommand(prev =>
           prev < filteredCommands.length - 1 ? prev + 1 : 0
         );
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setSelectedCommand(prev => 
+        setSelectedCommand(prev =>
           prev > 0 ? prev - 1 : filteredCommands.length - 1
         );
       } else if (e.key === 'Tab' || e.key === 'Enter') {
@@ -178,11 +186,10 @@ export function InputField({ input, handleInputChange, handleSubmit, isLoading, 
                       key={command.command}
                       type="button"
                       onClick={() => executeCommand(command)}
-                      className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
-                        index === selectedCommand
-                          ? 'bg-blue-50 border border-blue-200'
-                          : 'hover:bg-gray-50'
-                      }`}
+                      className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${index === selectedCommand
+                        ? 'bg-blue-50 border border-blue-200'
+                        : 'hover:bg-gray-50'
+                        }`}
                     >
                       <div className="flex items-center space-x-3">
                         <div className="flex-shrink-0">
@@ -198,9 +205,8 @@ export function InputField({ input, handleInputChange, handleSubmit, isLoading, 
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className={`font-medium text-sm ${
-                            index === selectedCommand ? 'text-blue-700' : 'text-gray-900'
-                          }`}>
+                          <div className={`font-medium text-sm ${index === selectedCommand ? 'text-blue-700' : 'text-gray-900'
+                            }`}>
                             {command.command}
                           </div>
                           <div className="text-xs text-gray-500 mt-1 line-clamp-2">
@@ -216,22 +222,33 @@ export function InputField({ input, handleInputChange, handleSubmit, isLoading, 
                 </div>
               </div>
             )}
-            
+
             <input
               ref={inputRef}
               value={input}
               onChange={handleInputChangeWithCommands}
               onKeyDown={handleKeyDown}
-              placeholder="Ask a question, write SQL, or use commands like /dashboard, /analytics..."
-              className="w-full rounded-xl border border-gray-200 px-5 py-4 text-sm text-gray-900 bg-gray-50 focus:bg-white focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all duration-200 placeholder-gray-400"
-              disabled={isLoading}
+              placeholder={
+                disabled
+                  ? "Your account is not approved. Queries are disabled."
+                  : "Ask a question, write SQL, or use commands like /dashboard, /analytics..."
+              }
+              className={`w-full rounded-xl border border-gray-200 px-5 py-4 text-sm text-gray-900 
+    ${disabled ? "bg-gray-100 cursor-not-allowed" : "bg-gray-50 focus:bg-white"} 
+    focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 
+    transition-all duration-200 placeholder-gray-400`}
+              disabled={isLoading || disabled}
             />
           </div>
-          
+
           <button
             type="submit"
-            disabled={isLoading || !input.trim()}
-            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-400 text-white px-8 py-4 rounded-xl font-medium text-sm transition-all duration-200 shadow-md hover:shadow-lg disabled:cursor-not-allowed disabled:shadow-none transform hover:scale-105 disabled:transform-none"
+            disabled={isLoading || !input.trim() || disabled}
+            className={`px-8 py-4 rounded-xl font-medium text-sm transition-all duration-200 shadow-md 
+    ${disabled
+                ? "bg-gray-300 text-gray-600 cursor-not-allowed shadow-none"
+                : "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white hover:shadow-lg transform hover:scale-105"}
+  `}
           >
             {isLoading ? (
               <div className="flex items-center space-x-2">
@@ -240,10 +257,12 @@ export function InputField({ input, handleInputChange, handleSubmit, isLoading, 
               </div>
             ) : (
               <div className="flex items-center space-x-2">
-                <span>Send</span>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
+                <span>{disabled ? "Restricted" : "Send"}</span>
+                {!disabled && (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                )}
               </div>
             )}
           </button>

@@ -1,7 +1,7 @@
 'use client';
 
 // import { useChat } from 'ai/react';
-import {useChat } from '@ai-sdk/react'
+import { useChat } from '@ai-sdk/react'
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -15,16 +15,38 @@ import { AuthManager, type UserData } from '@/utils/auth';
 import toast from 'react-hot-toast';
 
 export function ChatInterface() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+  // Inside ChatInterface
+  const { messages, input, handleInputChange, handleSubmit: baseHandleSubmit, isLoading } = useChat({
     api: '/api/chat',
+    headers: {
+      ...AuthManager.getAuthHeader(),
+      "x-user-data": JSON.stringify(AuthManager.getUserData()),
+    },
     initialMessages: [
       {
         id: '1',
         role: 'assistant',
-        content: 'Welcome to AI-SafeQuery! I\'m your intelligent database assistant with built-in governance and compliance features.\n\n🔐 **Safety Features Active:**\n• Role-based access control (RBAC)\n• AI-powered query validation\n• Blockchain audit logging\n• Admin approval workflow\n\nYou can ask me questions in natural language or write SQL queries. I\'ll help you query the database safely while ensuring all operations are logged and compliant.\n\n💡 **Quick Commands:** Type `/` to see available interactive tools like `/dashboard`, `/analytics`, `/logs`, `/status`, and `/help`.',
+        content:
+          "Welcome to AI-SafeQuery! I'm your intelligent database assistant...",
       },
     ],
   });
+
+
+  // Wrapper for handleSubmit
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!currentUser?.is_approved || currentUser.account_status !== 'active') {
+      toast.error('Your account is not approved by admin. Queries are disabled.');
+      return;
+    }
+
+    await baseHandleSubmit(event);
+  };
+
+
+  console.log("CUrrent loggin user", AuthManager.getUserData());
 
   const [interactiveTools, setInteractiveTools] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
@@ -34,9 +56,10 @@ export function ChatInterface() {
   // Check authentication and load user data on component mount
   useEffect(() => {
     const userData = AuthManager.getUserData();
-    
+
     if (!userData || !AuthManager.isAuthenticated()) {
       toast.error('Please log in to access the chat interface.');
+
       router.push('/auth/login');
       return;
     }
@@ -119,7 +142,7 @@ export function ChatInterface() {
             {messages.map((message) => (
               <ChatMessage key={message.id} message={message} />
             ))}
-            
+
             {isLoading && (
               <div className="flex justify-start mb-6">
                 <div className="bg-white text-gray-800 mr-8 border border-gray-100 shadow-md max-w-[75%] rounded-2xl px-5 py-4">
@@ -148,6 +171,7 @@ export function ChatInterface() {
               handleSubmit={handleSubmit}
               isLoading={isLoading}
               onCommandExecuted={handleCommandExecuted}
+              disabled={!currentUser?.is_approved || currentUser.account_status !== 'active'} // 🔐 Restriction
             />
           </div>
         </div>

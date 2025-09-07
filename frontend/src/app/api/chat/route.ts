@@ -1,7 +1,24 @@
-import { google } from '@ai-sdk/google';
-import { Agent } from '@mastra/core/agent';
-import { generateSafeQuery, querySafetyCheck, executeQuery, generateResponse, fetchDatabaseSchema } from './tools/index';
+import { google } from "@ai-sdk/google";
+import { Agent } from "@mastra/core/agent";
+import {
+  generateSafeQuery,
+  querySafetyCheck,
+  executeQuery,
+  generateResponse,
+  fetchDatabaseSchema,
+} from "./tools/index";
+import { AuthManager } from "@/utils/auth";
+import jwt from "jsonwebtoken";
 
+interface DecodedUser {
+  id: string;
+  username: string;
+  email: string;
+  is_approved: boolean;
+  is_active: boolean;
+  is_blocked: boolean;
+  account_status: string;
+}
 // System instructions for the AI-SafeQuery assistant
 const systemInstructions = `You are an AI assistant for AI-SafeQuery, a database query interface with governance and compliance features.
 
@@ -42,37 +59,66 @@ Context: This is a governance and compliance system for database access with blo
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
 
+function getUserFromRequest(req: Request): DecodedUser | null {
+  const userHeader = req.headers.get("x-user-data");
+  if (!userHeader) return null;
+
+  try {
+    return JSON.parse(userHeader) as DecodedUser;
+  } catch (err) {
+    console.error("Invalid user data header:", err);
+    return null;
+  }
+}
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
+    const user = getUserFromRequest(req);
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+      });
+    }
+
+    if (
+      !user.is_approved ||
+      user.account_status !== "active" ||
+      user.is_blocked
+    ) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+      });
+    }
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(
-        JSON.stringify({ error: 'Missing or invalid messages in request body' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          error: "Missing or invalid messages in request body",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
     // Get the last user message
     const lastMessage = messages[messages.length - 1];
-    if (!lastMessage || lastMessage.role !== 'user') {
+    if (!lastMessage || lastMessage.role !== "user") {
       return new Response(
-        JSON.stringify({ error: 'Last message must be from user' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: "Last message must be from user" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
     const agent = new Agent({
-      name: 'AI-SafeQuery Assistant',
+      name: "AI-SafeQuery Assistant",
       instructions: systemInstructions,
       tools: {
         fetchDatabaseSchema,
         querySafetyCheck,
         generateSafeQuery,
         executeQuery,
-        generateResponse
+        generateResponse,
       },
-      model: google('gemini-2.5-pro'),
+      model: google("gemini-1.5-flash"),
     });
 
     const response = await agent.stream(messages, {
@@ -80,28 +126,27 @@ export async function POST(req: Request) {
         console.table({
           promptTokens: usage.promptTokens,
           completionTokens: usage.completionTokens,
-          totalTokens: usage.totalTokens
+          totalTokens: usage.totalTokens,
         });
       },
       onError: (err) => {
-        console.error('Agent error:', err);
-      }
+        console.error("Agent error:", err);
+      },
     });
 
     return response.toDataStreamResponse();
-
   } catch (error) {
-    console.error('Chat API error:', error);
-    
+    console.error("Chat API error:", error);
+
     // Return error response
     return new Response(
-      JSON.stringify({ 
-        error: 'Failed to process chat request',
-        details: error instanceof Error ? error.message : 'Unknown error'
+      JSON.stringify({
+        error: "Failed to process chat request",
+        details: error instanceof Error ? error.message : "Unknown error",
       }),
-      { 
+      {
         status: 500,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { "Content-Type": "application/json" },
       }
     );
   }
@@ -110,28 +155,28 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const chatId = searchParams.get('id');
+    const chatId = searchParams.get("id");
 
     if (!chatId) {
-      return new Response(
-        JSON.stringify({ error: 'Chat ID is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Chat ID is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // For now, return empty messages array
     // In a real implementation, you would fetch from your database
     const messages: Array<{ role: string; content: string }> = [];
-    
-    return new Response(
-      JSON.stringify({ messages }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    );
+
+    return new Response(JSON.stringify({ messages }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (error) {
-    console.error('Error fetching chat history:', error);
+    console.error("Error fetching chat history:", error);
     return new Response(
-      JSON.stringify({ error: 'Error fetching chat history' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: "Error fetching chat history" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 }
