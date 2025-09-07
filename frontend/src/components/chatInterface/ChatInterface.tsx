@@ -43,8 +43,6 @@ export function ChatInterface() {
   };
 
 
-
-  const [interactiveTools, setInteractiveTools] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();

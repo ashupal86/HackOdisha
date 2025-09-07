@@ -1,9 +1,45 @@
-interface DashboardProps {
-  data: any;
+export interface Metric {
+  label: string;
+  value: number | string;
+  trend: 'up' | 'down';
+  change: string;
 }
 
+interface ChartItem {
+  type: string;
+  count: number;
+  percentage: number;
+}
+
+interface TimelineItem {
+  time: string;
+  queries: number;
+}
+
+interface ActivityItem {
+  user: string;
+  action: string;
+  status: 'approved' | 'pending' | 'other';
+  time: string;
+}
+
+export interface DashboardContent {
+  title: string;
+  metrics: Metric[];
+  charts: {
+    queryTypes: ChartItem[];
+    timelineData: TimelineItem[];
+  };
+  recentActivity: ActivityItem[];
+}
+
+interface DashboardProps {
+  data: DashboardContent; // no nested "content"
+}
+
+
 export function InteractiveDashboard({ data }: DashboardProps) {
-  const { title, metrics, charts, recentActivity } = data.content;
+  const { title, metrics, charts, recentActivity } = data;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6 mb-6">
@@ -18,7 +54,7 @@ export function InteractiveDashboard({ data }: DashboardProps) {
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {metrics.map((metric: any, index: number) => (
+        {metrics.map((metric, index) => (
           <div key={index} className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl p-4 border border-gray-100">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-600">{metric.label}</span>
@@ -39,7 +75,7 @@ export function InteractiveDashboard({ data }: DashboardProps) {
         <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
           <h4 className="text-lg font-semibold text-gray-900 mb-4">Query Types Distribution</h4>
           <div className="space-y-3">
-            {charts.queryTypes.map((item: any, index: number) => (
+            {charts.queryTypes.map((item, index) => (
               <div key={index} className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className={`w-3 h-3 rounded-full ${
@@ -62,7 +98,7 @@ export function InteractiveDashboard({ data }: DashboardProps) {
         <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
           <h4 className="text-lg font-semibold text-gray-900 mb-4">Query Timeline (24h)</h4>
           <div className="flex items-end justify-between h-32 space-x-2">
-            {charts.timelineData.map((item: any, index: number) => (
+            {charts.timelineData.map((item, index) => (
               <div key={index} className="flex flex-col items-center flex-1">
                 <div 
                   className="bg-blue-500 rounded-t w-full"
@@ -79,7 +115,7 @@ export function InteractiveDashboard({ data }: DashboardProps) {
       <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
         <h4 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h4>
         <div className="space-y-3">
-          {recentActivity.map((activity: any, index: number) => (
+          {recentActivity.map((activity, index) => (
             <div key={index} className="flex items-center justify-between py-2">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">

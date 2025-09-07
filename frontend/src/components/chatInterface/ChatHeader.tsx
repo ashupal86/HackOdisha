@@ -2,10 +2,6 @@
 import axios from 'axios';
 import React from 'react';
 import { useEffect, useState } from 'react';
-interface ChatHeaderProps {
-  title?: string;
-  isOnline?: boolean;
-}
 
 interface HealthResponse {
   status: string;
@@ -13,9 +9,12 @@ interface HealthResponse {
   version: string;
 }
 
+interface ChatHeaderProps {
+  title?: string;
+}
+
 const ChatHeader: React.FC<ChatHeaderProps> = ({
   title = "AI SafeQuery Assistant",
-  isOnline = true
 }) => {
   const [systemStatus, setSystemStatus] = useState<{
     isHealthy: boolean;

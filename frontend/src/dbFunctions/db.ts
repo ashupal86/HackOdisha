@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool } from "pg";
 
 // Type definitions
 interface DatabaseResult<T> {
@@ -6,6 +6,15 @@ interface DatabaseResult<T> {
   error?: string;
   data?: T;
 }
+
+interface PgStatActivityRow {
+  username: string | null;
+  query_preview: string;
+  state: string | null;
+  query_start: string | null;
+  client_addr: string | null;
+}
+
 
 interface QueryResult {
   rows: Record<string, unknown>[];
@@ -96,7 +105,10 @@ export function getDbPool(): Pool {
   if (!pool) {
     pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      ssl:
+        process.env.NODE_ENV === "production"
+          ? { rejectUnauthorized: false }
+          : false,
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
@@ -105,7 +117,10 @@ export function getDbPool(): Pool {
   return pool;
 }
 
-export async function executeDbQuery(query: string, params: unknown[] = []): Promise<DatabaseResult<QueryResult>> {
+export async function executeDbQuery(
+  query: string,
+  params: unknown[] = []
+): Promise<DatabaseResult<QueryResult>> {
   const client = await getDbPool().connect();
   try {
     const result = await client.query(query, params);
@@ -115,13 +130,13 @@ export async function executeDbQuery(query: string, params: unknown[] = []): Pro
         rows: result.rows,
         rowCount: result.rowCount,
         command: result.command,
-        fields: result.fields
-      }
+        fields: result.fields,
+      },
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Database query failed'
+      error: error instanceof Error ? error.message : "Database query failed",
     };
   } finally {
     client.release();
@@ -160,25 +175,31 @@ export async function getAllTables(): Promise<DatabaseResult<TableInfo[]>> {
     if (result.success && result.data) {
       return {
         success: true,
-        data: result.data.rows as TableInfo[]
+        data: result.data.rows as unknown as TableInfo[],
       };
     } else {
       return {
         success: false,
-        error: result.error || 'Failed to fetch tables'
+        error: result.error || "Failed to fetch tables",
       };
     }
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch database schema'
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch database schema",
     };
   }
 }
 
-export async function getTableColumns(tableName: string): Promise<DatabaseResult<ColumnInfo[]>> {
+export async function getTableColumns(
+  tableName: string
+): Promise<DatabaseResult<ColumnInfo[]>> {
   try {
-    const result = await executeDbQuery(`
+    const result = await executeDbQuery(
+      `
       SELECT 
         column_name,
         data_type,
@@ -191,28 +212,35 @@ export async function getTableColumns(tableName: string): Promise<DatabaseResult
       WHERE table_schema = 'public' 
       AND table_name = $1
       ORDER BY ordinal_position
-    `, [tableName]);
+    `,
+      [tableName]
+    );
 
     if (result.success && result.data) {
       return {
         success: true,
-        data: result.data.rows as ColumnInfo[]
+        data: result.data.rows as unknown as ColumnInfo[],
       };
     } else {
       return {
         success: false,
-        error: result.error || 'Failed to fetch table columns'
+        error: result.error || "Failed to fetch table columns",
       };
     }
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch table columns'
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch table columns",
     };
   }
 }
 
-export async function getForeignKeys(): Promise<DatabaseResult<ForeignKeyInfo[]>> {
+export async function getForeignKeys(): Promise<
+  DatabaseResult<ForeignKeyInfo[]>
+> {
   try {
     const query = `
       SELECT 
@@ -231,30 +259,33 @@ export async function getForeignKeys(): Promise<DatabaseResult<ForeignKeyInfo[]>
       WHERE tc.constraint_type = 'FOREIGN KEY'
       ORDER BY tc.table_name, kcu.column_name;
     `;
-    
+
     const result = await executeDbQuery(query);
-    
+
     if (result.success && result.data) {
       return {
         success: true,
-        data: result.data.rows as ForeignKeyInfo[]
+        data: result.data.rows as unknown as ForeignKeyInfo[],
       };
     } else {
       return {
         success: false,
-        error: result.error || 'Failed to fetch foreign keys'
+        error: result.error || "Failed to fetch foreign keys",
       };
     }
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch foreign keys'
+      error:
+        error instanceof Error ? error.message : "Failed to fetch foreign keys",
     };
   }
 }
 
 // Database monitoring functions
-export async function getDatabaseMetrics(): Promise<DatabaseResult<DatabaseMetrics>> {
+export async function getDatabaseMetrics(): Promise<
+  DatabaseResult<DatabaseMetrics>
+> {
   try {
     const activeQueriesQuery = `
       SELECT count(*) as active_queries
@@ -278,37 +309,52 @@ export async function getDatabaseMetrics(): Promise<DatabaseResult<DatabaseMetri
     const [activeQueries, dbSize, connectionStats] = await Promise.all([
       executeDbQuery(activeQueriesQuery),
       executeDbQuery(dbSizeQuery),
-      executeDbQuery(connectionStatsQuery)
+      executeDbQuery(connectionStatsQuery),
     ]);
 
-    if (activeQueries.success && dbSize.success && connectionStats.success && 
-        activeQueries.data && dbSize.data && connectionStats.data) {
+    if (
+      activeQueries.success &&
+      dbSize.success &&
+      connectionStats.success &&
+      activeQueries.data &&
+      dbSize.data &&
+      connectionStats.data
+    ) {
       return {
         success: true,
         data: {
-          activeQueries: activeQueries.data.rows[0].active_queries?.toString() || '0',
-          dbSize: dbSize.data.rows[0].db_size?.toString() || '0',
-          dbSizeBytes: dbSize.data.rows[0].db_size_bytes?.toString() || '0',
-          totalConnections: connectionStats.data.rows[0].total_connections?.toString() || '0',
-          activeConnections: connectionStats.data.rows[0].active_connections?.toString() || '0',
-          idleConnections: connectionStats.data.rows[0].idle_connections?.toString() || '0'
-        }
+          activeQueries:
+            activeQueries.data.rows[0].active_queries?.toString() || "0",
+          dbSize: dbSize.data.rows[0].db_size?.toString() || "0",
+          dbSizeBytes: dbSize.data.rows[0].db_size_bytes?.toString() || "0",
+          totalConnections:
+            connectionStats.data.rows[0].total_connections?.toString() || "0",
+          activeConnections:
+            connectionStats.data.rows[0].active_connections?.toString() || "0",
+          idleConnections:
+            connectionStats.data.rows[0].idle_connections?.toString() || "0",
+        },
       };
     } else {
       return {
         success: false,
-        error: 'Failed to fetch database metrics'
+        error: "Failed to fetch database metrics",
       };
     }
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch database metrics'
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch database metrics",
     };
   }
 }
 
-export async function getQueryPerformanceStats(): Promise<DatabaseResult<QueryPerformanceInfo[]>> {
+export async function getQueryPerformanceStats(): Promise<
+  DatabaseResult<QueryPerformanceInfo[]>
+> {
   try {
     const query = `
       SELECT 
@@ -327,38 +373,36 @@ export async function getQueryPerformanceStats(): Promise<DatabaseResult<QueryPe
     `;
 
     const result = await executeDbQuery(query);
-    
+
     if (result.success && result.data) {
       return {
         success: true,
-        data: result.data.rows as QueryPerformanceInfo[]
+        data: result.data.rows as unknown as QueryPerformanceInfo[],
       };
     } else {
       // Fallback if pg_stat_statements is not available
       return {
         success: true,
-        data: []
+        data: [],
       };
     }
   } catch (error) {
+    console.error("Error fetching full database schema:", error);
     return {
       success: true,
-      data: []
+      data: [],
     };
   }
 }
-
 export async function getRecentActivity(): Promise<DatabaseResult<ActivityInfo[]>> {
   try {
     const query = `
       SELECT 
         usename as username,
-        application_name,
-        client_addr,
+        LEFT(query, 100) as query_preview,
         state,
         query_start,
-        LEFT(query, 100) as query_preview,
-        state_change
+        client_addr
       FROM pg_stat_activity 
       WHERE query IS NOT NULL 
         AND query NOT LIKE '%pg_stat_activity%'
@@ -368,20 +412,27 @@ export async function getRecentActivity(): Promise<DatabaseResult<ActivityInfo[]
     `;
 
     const result = await executeDbQuery(query);
-    
+
     if (result.success && result.data) {
-      const activities = result.data.rows.map((row: any) => ({
+      // Cast rows to proper type
+      const rows = result.data.rows as unknown as PgStatActivityRow[];
+
+      const activities: ActivityInfo[] = rows.map(row => ({
         id: Math.random(),
         user: row.username || 'unknown',
         query: row.query_preview,
-        status: row.state === 'active' ? 'active' : row.state === 'idle' ? 'idle' : 'completed',
+        status: row.state === 'active'
+          ? 'active'
+          : row.state === 'idle'
+          ? 'idle'
+          : 'completed',
         time: row.query_start ? new Date(row.query_start).toLocaleString() : 'unknown',
         clientAddr: row.client_addr
       }));
 
       return {
         success: true,
-        data: activities as ActivityInfo[]
+        data: activities
       };
     } else {
       return {
@@ -416,46 +467,49 @@ export async function getDatabaseHealth(): Promise<DatabaseResult<HealthInfo>> {
 
     const [health, uptime] = await Promise.all([
       executeDbQuery(healthQuery),
-      executeDbQuery(upTimeQuery)
+      executeDbQuery(upTimeQuery),
     ]);
 
     if (health.success && uptime.success && health.data && uptime.data) {
       return {
         success: true,
         data: {
-          postgresVersion: health.data.rows[0].postgres_version,
-          isInRecovery: health.data.rows[0].is_in_recovery,
-          maxConnections: health.data.rows[0].max_connections,
-          sharedBuffers: health.data.rows[0].shared_buffers,
-          uptime: uptime.data.rows[0].uptime,
-          startTime: uptime.data.rows[0].start_time
-        }
+    postgresVersion: health.data.rows[0].postgres_version as string,
+    isInRecovery: health.data.rows[0].is_in_recovery as boolean,
+    maxConnections: health.data.rows[0].max_connections as number,
+    sharedBuffers: health.data.rows[0].shared_buffers as string,
+    uptime: uptime.data.rows[0].uptime as string,
+    startTime: uptime.data.rows[0].start_time as string,
+        },
       };
     } else {
       return {
         success: false,
-        error: 'Failed to fetch database health'
+        error: "Failed to fetch database health",
       };
     }
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch database health'
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch database health",
     };
   }
 }
 
 export async function getFullDatabaseSchema(): Promise<FullSchemaResult> {
   try {
-    console.log('Fetching complete database schema...');
-    
+    console.log("Fetching complete database schema...");
+
     // First, get all tables
     const tablesResult = await getAllTables();
-    
+
     if (!tablesResult.success || !tablesResult.data) {
       return {
         success: false,
-        error: tablesResult.error || 'Failed to fetch tables'
+        error: tablesResult.error || "Failed to fetch tables",
       };
     }
 
@@ -465,36 +519,43 @@ export async function getFullDatabaseSchema(): Promise<FullSchemaResult> {
     // For each table, get its columns
     for (const table of tables) {
       console.log(`Fetching columns for table: ${table.table_name}`);
-      
+
       const columnsResult = await getTableColumns(table.table_name);
-      
+
       if (columnsResult.success && columnsResult.data) {
         schema[table.table_name] = {
           columns: columnsResult.data,
-          tableInfo: table
+          tableInfo: table,
         };
       } else {
-        console.warn(`Failed to fetch columns for table ${table.table_name}: ${columnsResult.error}`);
+        console.warn(
+          `Failed to fetch columns for table ${table.table_name}: ${columnsResult.error}`
+        );
         // Continue with other tables even if one fails
         schema[table.table_name] = {
           columns: [],
-          tableInfo: table
+          tableInfo: table,
         };
       }
     }
 
-    console.log(`Successfully fetched schema for ${Object.keys(schema).length} tables`);
+    console.log(
+      `Successfully fetched schema for ${Object.keys(schema).length} tables`
+    );
 
     return {
       success: true,
       schema,
-      tableCount: Object.keys(schema).length
+      tableCount: Object.keys(schema).length,
     };
   } catch (error) {
-    console.error('Error fetching full database schema:', error);
+    console.error("Error fetching full database schema:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch full database schema'
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch full database schema",
     };
   }
 }

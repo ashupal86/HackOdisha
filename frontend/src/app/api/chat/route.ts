@@ -5,10 +5,10 @@ import {
   querySafetyCheck,
   executeQuery,
   generateResponse,
-  fetchDatabaseSchema, generateAnalyticsReport, displayAnalytics,
+  fetchDatabaseSchema,
+  generateAnalyticsReport,
+  displayAnalytics,
 } from "./tools/index";
-import { AuthManager } from "@/utils/auth";
-import jwt from "jsonwebtoken";
 
 interface DecodedUser {
   id: string;
@@ -19,6 +19,7 @@ interface DecodedUser {
   is_blocked: boolean;
   account_status: string;
 }
+
 // System instructions for the AI-SafeQuery assistant
 const systemInstructions = `You are an AI assistant for AI-SafeQuery, a database query interface with governance and compliance features.
 
@@ -70,6 +71,7 @@ Context: This is a governance and compliance system for database access with blo
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
 
+// Extract user from request headers
 function getUserFromRequest(req: Request): DecodedUser | null {
   const userHeader = req.headers.get("x-user-data");
   if (!userHeader) return null;
@@ -81,21 +83,20 @@ function getUserFromRequest(req: Request): DecodedUser | null {
     return null;
   }
 }
+
+// --- POST /api/chat ---
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
     const user = getUserFromRequest(req);
+
     if (!user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
       });
     }
 
-    if (
-      !user.is_approved ||
-      user.account_status !== "active" ||
-      user.is_blocked
-    ) {
+    if (!user.is_approved || user.account_status !== "active" || user.is_blocked) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
       });
@@ -103,20 +104,17 @@ export async function POST(req: Request) {
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(
-        JSON.stringify({
-          error: "Missing or invalid messages in request body",
-        }),
+        JSON.stringify({ error: "Missing or invalid messages in request body" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    // Get the last user message
     const lastMessage = messages[messages.length - 1];
     if (!lastMessage || lastMessage.role !== "user") {
-      return new Response(
-        JSON.stringify({ error: "Last message must be from user" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Last message must be from user" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const agent = new Agent({
@@ -129,9 +127,9 @@ export async function POST(req: Request) {
         executeQuery,
         generateResponse,
         generateAnalyticsReport,
-        displayAnalytics
+        displayAnalytics,
       },
-      model: google("gemini-1.5-flash"),
+      model: google("gemini-2.5-pro"),
     });
 
     const response = await agent.stream(messages, {
@@ -151,20 +149,17 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("Chat API error:", error);
 
-    // Return error response
     return new Response(
       JSON.stringify({
         error: "Failed to process chat request",
         details: error instanceof Error ? error.message : "Unknown error",
       }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 }
 
+// --- GET /api/chat?id=xxx ---
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -177,8 +172,7 @@ export async function GET(req: Request) {
       });
     }
 
-    // For now, return empty messages array
-    // In a real implementation, you would fetch from your database
+    // TODO: Fetch chat history from DB. For now, return empty.
     const messages: Array<{ role: string; content: string }> = [];
 
     return new Response(JSON.stringify({ messages }), {

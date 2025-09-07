@@ -11,7 +11,6 @@ export interface UserData {
   created_at: string;
   message?: string;
 }
-const LOG_TOKEN_KEY = "log_token";
 
 export interface AuthSession {
   access_token: string;
@@ -23,6 +22,7 @@ export interface AuthSession {
 const AUTH_TOKEN_KEY = "auth_token";
 const USER_DATA_KEY = "user_data";
 const AUTH_SESSION_KEY = "auth_session";
+const LOG_TOKEN_KEY = "log_token";
 
 export class AuthManager {
   // Store complete authentication session
@@ -31,8 +31,10 @@ export class AuthManager {
       sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(authData));
       sessionStorage.setItem(AUTH_TOKEN_KEY, authData.access_token);
       sessionStorage.setItem(USER_DATA_KEY, JSON.stringify(authData.user));
-    } catch (error) {
-      console.error("Failed to store auth session:", error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Failed to store auth session:", error.message);
+      }
     }
   }
 
@@ -40,9 +42,11 @@ export class AuthManager {
   static getAuthSession(): AuthSession | null {
     try {
       const sessionData = sessionStorage.getItem(AUTH_SESSION_KEY);
-      return sessionData ? JSON.parse(sessionData) : null;
-    } catch (error) {
-      console.error("Failed to retrieve auth session:", error);
+      return sessionData ? (JSON.parse(sessionData) as AuthSession) : null;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Failed to retrieve auth session:", error.message);
+      }
       return null;
     }
   }
@@ -51,8 +55,10 @@ export class AuthManager {
   static getAccessToken(): string | null {
     try {
       return sessionStorage.getItem(AUTH_TOKEN_KEY);
-    } catch (error) {
-      console.error("Failed to retrieve access token:", error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Failed to retrieve access token:", error.message);
+      }
       return null;
     }
   }
@@ -61,9 +67,11 @@ export class AuthManager {
   static getUserData(): UserData | null {
     try {
       const userData = sessionStorage.getItem(USER_DATA_KEY);
-      return userData ? JSON.parse(userData) : null;
-    } catch (error) {
-      console.error("Failed to retrieve user data:", error);
+      return userData ? (JSON.parse(userData) as UserData) : null;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Failed to retrieve user data:", error.message);
+      }
       return null;
     }
   }
@@ -76,19 +84,19 @@ export class AuthManager {
   // Check if user is approved
   static isUserApproved(): boolean {
     const userData = this.getUserData();
-    return userData?.is_approved || false;
+    return userData?.is_approved ?? false;
   }
 
   // Check if user has access
   static hasAccess(): boolean {
     const userData = this.getUserData();
-    return userData?.is_accessible || false;
+    return userData?.is_accessible ?? false;
   }
 
   // Get user status
   static getUserStatus(): string {
     const userData = this.getUserData();
-    return userData?.account_status || "unknown";
+    return userData?.account_status ?? "unknown";
   }
 
   // Clear all authentication data
@@ -97,13 +105,15 @@ export class AuthManager {
       sessionStorage.removeItem(AUTH_SESSION_KEY);
       sessionStorage.removeItem(AUTH_TOKEN_KEY);
       sessionStorage.removeItem(USER_DATA_KEY);
-    } catch (error) {
-      console.error("Failed to clear auth data:", error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Failed to clear auth data:", error.message);
+      }
     }
   }
 
   // Get authorization header for API requests
-  static getAuthHeader(): { Authorization: string } | {} {
+  static getAuthHeader(): { Authorization: string } | Record<string, never> {
     const token = this.getAccessToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
@@ -119,16 +129,21 @@ export class AuthManager {
         session.user = userData;
         sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
       }
-    } catch (error) {
-      console.error("Failed to update user data:", error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Failed to update user data:", error.message);
+      }
     }
   }
 
+  // Save log token
   static setLogToken(token: string): void {
     try {
       sessionStorage.setItem(LOG_TOKEN_KEY, token);
-    } catch (error) {
-      console.error("Failed to store log token:", error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Failed to store log token:", error.message);
+      }
     }
   }
 
@@ -136,8 +151,10 @@ export class AuthManager {
   static getLogToken(): string | null {
     try {
       return sessionStorage.getItem(LOG_TOKEN_KEY);
-    } catch (error) {
-      console.error("Failed to retrieve log token:", error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Failed to retrieve log token:", error.message);
+      }
       return null;
     }
   }
@@ -146,13 +163,15 @@ export class AuthManager {
   static clearLogToken(): void {
     try {
       sessionStorage.removeItem(LOG_TOKEN_KEY);
-    } catch (error) {
-      console.error("Failed to clear log token:", error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Failed to clear log token:", error.message);
+      }
     }
   }
 
   // Get auth header for log API
-  static getLogAuthHeader(): { Authorization: string } | {} {
+  static getLogAuthHeader(): { Authorization: string } | Record<string, never> {
     const token = this.getLogToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   }

@@ -1,14 +1,38 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
+import { NextRequest, NextResponse } from "next/server";
+import { Pool } from "pg";
+import type { QueryResultRow } from "pg";
 
-// Database connection pool
+// --- Types for query results ---
+interface ActivityRow {
+  username: string | null;
+  application_name: string | null;
+  client_addr: string | null;
+  state: string | null;
+  query_start: string | null;
+  query_preview: string | null;
+  state_change: string | null;
+}
+
+interface Activity {
+  id: string;
+  user: string;
+  query: string | null;
+  status: "active" | "idle" | "completed";
+  time: string;
+  clientAddr: string | null;
+}
+
+// --- Database connection pool ---
 let pool: Pool | null = null;
 
 function getDbPool(): Pool {
   if (!pool) {
     pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      ssl:
+        process.env.NODE_ENV === "production"
+          ? { rejectUnauthorized: false }
+          : false,
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
@@ -17,25 +41,30 @@ function getDbPool(): Pool {
   return pool;
 }
 
-async function executeDbQuery(query: string, params: unknown[] = []) {
+// --- Execute database query safely ---
+async function executeDbQuery<T extends QueryResultRow = Record<string, unknown>>(
+  query: string,
+  params: unknown[] = []
+) {
   const client = await getDbPool().connect();
   try {
-    const result = await client.query(query, params);
+    const result = await client.query<T>(query, params);
     return {
-      success: true,
+      success: true as const,
       rows: result.rows,
       rowCount: result.rowCount,
     };
   } catch (error) {
     return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Database query failed'
+      success: false as const,
+      error: error instanceof Error ? error.message : "Database query failed",
     };
   } finally {
     client.release();
   }
 }
 
+// --- Metrics ---
 async function getDatabaseMetrics() {
   try {
     const activeQueriesQuery = `
@@ -60,7 +89,7 @@ async function getDatabaseMetrics() {
     const [activeQueries, dbSize, connectionStats] = await Promise.all([
       executeDbQuery(activeQueriesQuery),
       executeDbQuery(dbSizeQuery),
-      executeDbQuery(connectionStatsQuery)
+      executeDbQuery(connectionStatsQuery),
     ]);
 
     if (activeQueries.success && dbSize.success && connectionStats.success) {
@@ -68,27 +97,32 @@ async function getDatabaseMetrics() {
         success: true,
         metrics: {
           activeQueries: String(activeQueries.rows[0]?.active_queries || 0),
-          dbSize: String(dbSize.rows[0]?.db_size || '0 MB'),
+          dbSize: String(dbSize.rows[0]?.db_size || "0 MB"),
           dbSizeBytes: String(dbSize.rows[0]?.db_size_bytes || 0),
-          totalConnections: String(connectionStats.rows[0]?.total_connections || 0),
-          activeConnections: String(connectionStats.rows[0]?.active_connections || 0),
-          idleConnections: String(connectionStats.rows[0]?.idle_connections || 0)
-        }
+          totalConnections: String(
+            connectionStats.rows[0]?.total_connections || 0
+          ),
+          activeConnections: String(
+            connectionStats.rows[0]?.active_connections || 0
+          ),
+          idleConnections: String(
+            connectionStats.rows[0]?.idle_connections || 0
+          ),
+        },
       };
     }
-    
-    return {
-      success: false,
-      error: 'Failed to fetch database metrics'
-    };
+
+    return { success: false, error: "Failed to fetch database metrics" };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch database metrics'
+      error:
+        error instanceof Error ? error.message : "Failed to fetch database metrics",
     };
   }
 }
 
+// --- Recent Activity ---
 async function getRecentActivity() {
   try {
     const query = `
@@ -108,36 +142,42 @@ async function getRecentActivity() {
       LIMIT 10;
     `;
 
-    const result = await executeDbQuery(query);
-    
+const result = await executeDbQuery<ActivityRow>(query);
+
     if (result.success) {
-      const activities = result.rows.map((row: any) => ({
-        id: Math.random(),
-        user: row.username || 'unknown',
+      const activities: Activity[] = result.rows.map((row, index) => ({
+        id: `${Date.now()}-${index}`, // safer than Math.random()
+        user: row.username ?? "unknown",
         query: row.query_preview,
-        status: row.state === 'active' ? 'active' : row.state === 'idle' ? 'idle' : 'completed',
-        time: row.query_start ? new Date(row.query_start).toLocaleString() : 'unknown',
-        clientAddr: row.client_addr
+        status:
+          row.state === "active"
+            ? "active"
+            : row.state === "idle"
+            ? "idle"
+            : "completed",
+        time: row.query_start
+          ? new Date(row.query_start).toLocaleString()
+          : "unknown",
+        clientAddr: row.client_addr,
       }));
-      
-      return {
-        success: true,
-        activities: activities
-      };
+
+      return { success: true, activities };
     }
-    
+
     return {
       success: false,
-      error: result.error || 'Failed to fetch recent activity'
+      error: result.error || "Failed to fetch recent activity",
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch recent activity'
+      error:
+        error instanceof Error ? error.message : "Failed to fetch recent activity",
     };
   }
 }
 
+// --- Database Health ---
 async function getDatabaseHealth() {
   try {
     const healthQuery = `
@@ -157,7 +197,7 @@ async function getDatabaseHealth() {
 
     const [health, uptime] = await Promise.all([
       executeDbQuery(healthQuery),
-      executeDbQuery(upTimeQuery)
+      executeDbQuery(upTimeQuery),
     ]);
 
     if (health.success && uptime.success) {
@@ -169,59 +209,55 @@ async function getDatabaseHealth() {
           maxConnections: health.rows[0]?.max_connections,
           sharedBuffers: health.rows[0]?.shared_buffers,
           uptime: uptime.rows[0]?.uptime,
-          startTime: uptime.rows[0]?.start_time
-        }
+          startTime: uptime.rows[0]?.start_time,
+        },
       };
     }
-    
-    return {
-      success: false,
-      error: 'Failed to fetch database health'
-    };
+
+    return { success: false, error: "Failed to fetch database health" };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch database health'
+      error:
+        error instanceof Error ? error.message : "Failed to fetch database health",
     };
   }
 }
 
+// --- API Route Handler ---
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type') || 'all';
+    const type = searchParams.get("type") || "all";
 
     switch (type) {
-      case 'metrics':
-        const metrics = await getDatabaseMetrics();
-        return NextResponse.json(metrics);
-      
-      case 'activity':
-        const activity = await getRecentActivity();
-        return NextResponse.json(activity);
-      
-      case 'health':
-        const health = await getDatabaseHealth();
-        return NextResponse.json(health);
-      
-      case 'all':
+      case "metrics":
+        return NextResponse.json(await getDatabaseMetrics());
+
+      case "activity":
+        return NextResponse.json(await getRecentActivity());
+
+      case "health":
+        return NextResponse.json(await getDatabaseHealth());
+
+      case "all":
       default:
         const [metricsResult, activityResult, healthResult] = await Promise.all([
           getDatabaseMetrics(),
           getRecentActivity(),
-          getDatabaseHealth()
+          getDatabaseHealth(),
         ]);
-        
+
         return NextResponse.json({
           metrics: metricsResult,
           activity: activityResult,
-          health: healthResult
+          health: healthResult,
         });
     }
   } catch (error) {
-    console.error('Database monitoring API error:', error);
+    console.error("Database monitoring API error:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch database data' },
+      { success: false, error: "Failed to fetch database data" },
       { status: 500 }
     );
   }

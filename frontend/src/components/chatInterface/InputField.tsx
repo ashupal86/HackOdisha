@@ -19,7 +19,6 @@ export function InputField({
   handleInputChange,
   handleSubmit,
   isLoading,
-  onCommandExecuted,
   disabled = false,
 }: InputFieldProps) {
   const [showCommands, setShowCommands] = useState(false);

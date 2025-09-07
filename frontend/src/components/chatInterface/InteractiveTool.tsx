@@ -1,40 +1,114 @@
-import { InteractiveDashboard } from './InteractiveDashboard';
-
-interface InteractiveToolProps {
-  data: any;
+import { InteractiveDashboard, DashboardContent } from './InteractiveDashboard';
+// ----- Types -----
+interface PerformanceMetric {
+  metric: string;
+  value: number | string;
+  benchmark: string;
+  status: 'excellent' | 'good' | 'average';
 }
 
-export function InteractiveTool({ data }: InteractiveToolProps) {
-  if (data.type === 'dashboard') {
-    return <InteractiveDashboard data={data} />;
-  }
+interface TopQuery {
+  query: string;
+  count: number;
+  avgTime: string;
+}
 
+interface UserActivity {
+  user: string;
+  queries: number;
+  approval_rate: string;
+}
+
+interface SecurityAlert {
+  type: string;
+  description: string;
+  severity: 'high' | 'medium';
+}
+
+interface Log {
+  id: string;
+  timestamp: string;
+  query: string;
+  user: string;
+  status: 'approved' | 'auto-approved' | 'rejected';
+  approver: string;
+  gasUsed: string;
+}
+
+interface LogSummary {
+  totalLogs: number;
+  approvedQueries: number;
+  rejectedQueries: number;
+  blockchainIntegrity: string;
+}
+
+interface ServiceStatus {
+  name: string;
+  status: string;
+  uptime: string;
+  response: string;
+}
+
+interface Command {
+  cmd: string;
+  desc: string;
+}
+
+// Discriminated union for InteractiveTool
+type InteractiveToolData =
+  | { type: 'dashboard'; data: DashboardContent } // InteractiveDashboard handles its own typing
+  | {
+      type: 'analytics';
+      content: {
+        title: string;
+        performanceMetrics: PerformanceMetric[];
+        topQueries: TopQuery[];
+        userActivity: UserActivity[];
+        securityAlerts: SecurityAlert[];
+      };
+    }
+  | { type: 'logs'; content: { title: string; logs: Log[]; summary: LogSummary } }
+  | { type: 'status'; content: { title: string; services: ServiceStatus[]; version: string; lastUpdate: string; totalUptime: string } }
+  | { type: 'help'; content: { title: string; commands: Command[]; examples: string[]; safety: string[] } };
+
+interface InteractiveToolProps {
+  data: InteractiveToolData;
+}
+
+
+// ----- Component -----
+export function InteractiveTool({ data }: InteractiveToolProps) {
+  // --- Dashboard ---
+if (data.type === 'dashboard') {
+  return <InteractiveDashboard data={data.data} />;
+}
+
+  // --- Analytics ---
   if (data.type === 'analytics') {
     const { title, performanceMetrics, topQueries, userActivity, securityAlerts } = data.content;
-    
+
     return (
       <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6 mb-6">
         <div className="flex items-center space-x-3 mb-6">
           <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
+            {/* icon */}
           </div>
           <h3 className="text-xl font-bold text-gray-900">{title}</h3>
         </div>
 
-        {/* Performance Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {performanceMetrics.map((metric: any, index: number) => (
-            <div key={index} className="bg-gradient-to-br from-gray-50 to-green-50 rounded-xl p-4 border border-gray-100">
+          {performanceMetrics.map((metric, idx) => (
+            <div key={idx} className="bg-gradient-to-br from-gray-50 to-green-50 rounded-xl p-4 border border-gray-100">
               <div className="text-sm font-medium text-gray-600 mb-1">{metric.metric}</div>
               <div className="text-2xl font-bold text-gray-900 mb-1">{metric.value}</div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-500">{metric.benchmark}</span>
                 <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                  metric.status === 'excellent' ? 'bg-green-100 text-green-700' :
-                  metric.status === 'good' ? 'bg-blue-100 text-blue-700' :
-                  'bg-yellow-100 text-yellow-700'
+                  metric.status === 'excellent'
+                    ? 'bg-green-100 text-green-700'
+                    : metric.status === 'good'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-yellow-100 text-yellow-700'
                 }`}>
                   {metric.status}
                 </span>
@@ -48,7 +122,7 @@ export function InteractiveTool({ data }: InteractiveToolProps) {
           <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
             <h4 className="text-lg font-semibold text-gray-900 mb-4">Top Executed Queries</h4>
             <div className="space-y-3">
-              {topQueries.map((query: any, index: number) => (
+              {topQueries.map((query, index) => (
                 <div key={index} className="bg-white rounded-lg p-3 border border-gray-100">
                   <div className="text-xs font-mono text-gray-700 mb-2 truncate">{query.query}</div>
                   <div className="flex items-center justify-between text-xs text-gray-500">
@@ -64,7 +138,7 @@ export function InteractiveTool({ data }: InteractiveToolProps) {
           <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
             <h4 className="text-lg font-semibold text-gray-900 mb-4">User Activity</h4>
             <div className="space-y-3">
-              {userActivity.map((user: any, index: number) => (
+              {userActivity.map((user, index) => (
                 <div key={index} className="flex items-center justify-between py-2">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -82,12 +156,11 @@ export function InteractiveTool({ data }: InteractiveToolProps) {
           </div>
         </div>
 
-        {/* Security Alerts */}
         {securityAlerts.length > 0 && (
           <div className="bg-red-50 rounded-xl p-4 border border-red-100">
             <h4 className="text-lg font-semibold text-red-900 mb-4">Security Alerts</h4>
             <div className="space-y-3">
-              {securityAlerts.map((alert: any, index: number) => (
+              {securityAlerts.map((alert, index) => (
                 <div key={index} className="flex items-start space-x-3">
                   <div className={`w-3 h-3 rounded-full mt-1 ${
                     alert.severity === 'high' ? 'bg-red-500' : 'bg-yellow-500'
@@ -105,21 +178,19 @@ export function InteractiveTool({ data }: InteractiveToolProps) {
     );
   }
 
+  // --- Logs ---
   if (data.type === 'logs') {
     const { title, logs, summary } = data.content;
-    
+
     return (
       <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6 mb-6">
         <div className="flex items-center space-x-3 mb-6">
           <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+            {/* icon */}
           </div>
           <h3 className="text-xl font-bold text-gray-900">{title}</h3>
         </div>
 
-        {/* Summary */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div className="bg-purple-50 rounded-lg p-3 border border-purple-100">
             <div className="text-sm text-purple-600">Total Logs</div>
@@ -139,11 +210,10 @@ export function InteractiveTool({ data }: InteractiveToolProps) {
           </div>
         </div>
 
-        {/* Logs Table */}
         <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
           <div className="space-y-3">
-            {logs.map((log: any, index: number) => (
-              <div key={index} className="bg-white rounded-lg p-4 border border-gray-100">
+            {logs.map((log) => (
+              <div key={log.id} className="bg-white rounded-lg p-4 border border-gray-100">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   <div>
                     <div className="text-xs text-gray-500 mb-1">Transaction ID</div>
@@ -179,20 +249,14 @@ export function InteractiveTool({ data }: InteractiveToolProps) {
     );
   }
 
+  // --- Status ---
   if (data.type === 'status') {
     const { title, services, version, lastUpdate, totalUptime } = data.content;
-    
+
     return (
       <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6 mb-6">
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-bold text-gray-900">{title}</h3>
-          </div>
+          <h3 className="text-xl font-bold text-gray-900">{title}</h3>
           <div className="text-right">
             <div className="text-sm text-gray-600">Version {version}</div>
             <div className="text-xs text-gray-500">Updated: {lastUpdate}</div>
@@ -200,22 +264,18 @@ export function InteractiveTool({ data }: InteractiveToolProps) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {services.map((service: any, index: number) => (
-            <div key={index} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+          {services.map((service) => (
+            <div key={service.name} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-medium text-gray-900">{service.name}</span>
                 <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <div className={`w-2 h-2 rounded-full ${service.status === 'operational' ? 'bg-green-500' : 'bg-red-500'}`}></div>
                   <span className="text-xs text-green-600 font-medium">{service.status}</span>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 text-xs text-gray-600">
-                <div>
-                  <span className="text-gray-500">Uptime:</span> {service.uptime}
-                </div>
-                <div>
-                  <span className="text-gray-500">Response:</span> {service.response}
-                </div>
+                <div>Uptime: {service.uptime}</div>
+                <div>Response: {service.response}</div>
               </div>
             </div>
           ))}
@@ -229,47 +289,38 @@ export function InteractiveTool({ data }: InteractiveToolProps) {
     );
   }
 
+  // --- Help ---
   if (data.type === 'help') {
     const { title, commands, examples, safety } = data.content;
-    
+
     return (
       <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6 mb-6">
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <h3 className="text-xl font-bold text-gray-900">{title}</h3>
-        </div>
-
+        <h3 className="text-xl font-bold text-gray-900 mb-6">{title}</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
             <h4 className="text-lg font-semibold text-gray-900 mb-4">Available Commands</h4>
             <div className="space-y-2">
-              {commands.map((cmd: any, index: number) => (
-                <div key={index} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+              {commands.map((cmd) => (
+                <div key={cmd.cmd} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                   <code className="text-sm font-mono text-blue-600">{cmd.cmd}</code>
                   <div className="text-xs text-gray-600 mt-1">{cmd.desc}</div>
                 </div>
               ))}
             </div>
           </div>
-
           <div>
             <h4 className="text-lg font-semibold text-gray-900 mb-4">Query Examples</h4>
             <div className="space-y-2 mb-6">
-              {examples.map((example: string, index: number) => (
-                <div key={index} className="bg-blue-50 rounded-lg p-3 border border-blue-100">
-                  <code className="text-sm font-mono text-blue-800">{example}</code>
+              {examples.map((ex, idx) => (
+                <div key={idx} className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                  <code className="text-sm font-mono text-blue-800">{ex}</code>
                 </div>
               ))}
             </div>
-
             <h4 className="text-lg font-semibold text-gray-900 mb-4">Safety Features</h4>
             <div className="space-y-2">
-              {safety.map((feature: string, index: number) => (
-                <div key={index} className="flex items-start space-x-2">
+              {safety.map((feature, idx) => (
+                <div key={idx} className="flex items-start space-x-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
                   <span className="text-sm text-gray-700">{feature}</span>
                 </div>
@@ -280,6 +331,5 @@ export function InteractiveTool({ data }: InteractiveToolProps) {
       </div>
     );
   }
-
   return null;
 }

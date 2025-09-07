@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { LoginForm } from '@/components/auth';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { AuthManager, type AuthSession } from '@/utils/auth';
 
 export default function LoginPage() {
@@ -20,27 +20,27 @@ export default function LoginPage() {
       // Show loading toast
       const loadingToast = toast.loading('Signing you in...');
 
-      const resp = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
-        username: data.username,
-        password: data.password
-      });
+      const resp = await axios.post<AuthSession>(
+        `${process.env.NEXT_PUBLIC_API_URL as string}/auth/login`,
+        {
+          username: data.username,
+          password: data.password,
+        }
+      );
 
       console.log('First backend token:', resp.data.user.id);
 
-      //after login call log api
-      const logResp = await axios.post(`${process.env.NEXT_PUBLIC_LOG_API_URL}/login`, {
-        user_id: resp.data.user.id,
-      });
+      // After login, call log API
+      const logResp = await axios.post<{ access_token: string }>(
+        `${process.env.NEXT_PUBLIC_LOG_API_URL as string}/login`,
+        { user_id: resp.data.user.id }
+      );
 
       const logToken = logResp.data.access_token;
       console.log('Second backend token:', logToken);
 
+      // Store log token
       AuthManager.setLogToken(logToken);
-
-      // Optionally store in AuthManager or localStorage if you need to use it later
-      AuthManager.setLogToken(logToken);
-
-      console.log("auth resp", resp.data);
 
       // Dismiss loading toast
       toast.dismiss(loadingToast);
@@ -56,40 +56,28 @@ export default function LoginPage() {
       if (userStatus === 'pending_approval' || !isApproved) {
         toast.success('Login successful! Note: Account pending approval.', {
           icon: '⏳',
-          style: {
-            background: '#F59E0B',
-            color: '#fff',
-          },
+          style: { background: '#F59E0B', color: '#fff' },
           duration: 4000,
         });
       } else if (userStatus === 'blocked') {
         toast.error('Account is blocked. Please contact support.', {
           icon: '🚫',
-          style: {
-            background: '#EF4444',
-            color: '#fff',
-          },
+          style: { background: '#EF4444', color: '#fff' },
         });
         // Don't redirect if blocked
         return;
       } else {
         toast.success('Login successful! Redirecting to chat...', {
           icon: '🎉',
-          style: {
-            background: '#10B981',
-            color: '#fff',
-          },
+          style: { background: '#10B981', color: '#fff' },
         });
       }
 
       // Show user message if available
       if (authSession.user.message) {
         setTimeout(() => {
-          toast(authSession.user.message!, {
-            style: {
-              background: '#3B82F6',
-              color: '#fff',
-            },
+          toast(authSession.user.message as string, {
+            style: { background: '#3B82F6', color: '#fff' },
             duration: 3000,
           });
         }, 1000);
@@ -99,27 +87,26 @@ export default function LoginPage() {
       setTimeout(() => {
         router.push('/chat');
       }, 1500);
+    } catch (err: unknown) {
+      console.error('Login error:', err);
 
-    } catch (error: any) {
-      console.error('Login error:', error);
+      let errorMessage =
+        'Login failed. Please check your credentials and try again.';
 
-      // Handle different error scenarios
-      let errorMessage = 'Login failed. Please check your credentials and try again.';
-
-      if (error.response?.status === 401) {
-        errorMessage = 'Invalid username or password.';
-      } else if (error.response?.status === 403) {
-        errorMessage = error.response.data?.detail || 'Account access denied.';
-      } else if (error.response?.data?.detail) {
-        errorMessage = error.response.data.detail;
+      if (axios.isAxiosError(err)) {
+        const axiosErr = err as AxiosError<{ detail?: string }>;
+        if (axiosErr.response?.status === 401) {
+          errorMessage = 'Invalid username or password.';
+        } else if (axiosErr.response?.status === 403) {
+          errorMessage = axiosErr.response.data?.detail || 'Account access denied.';
+        } else if (axiosErr.response?.data?.detail) {
+          errorMessage = axiosErr.response.data.detail;
+        }
       }
 
       toast.error(errorMessage, {
         icon: '❌',
-        style: {
-          background: '#EF4444',
-          color: '#fff',
-        },
+        style: { background: '#EF4444', color: '#fff' },
       });
     } finally {
       setIsLoading(false);

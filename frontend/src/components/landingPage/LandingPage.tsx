@@ -7,27 +7,37 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { 
   Shield, 
-  Brain, 
   Lock, 
   Zap, 
   Users, 
   CheckCircle, 
-  ArrowRight, 
-  Star,
   Database,
-  AlertTriangle,
   BarChart3,
   Globe,
   MessageCircle,
-  ChevronRight,
   Play,
   Code,
   TrendingUp,
   Eye
 } from "lucide-react";
+import { CSSProperties } from 'react';
 
-// Animated Database SVG Component
-const DatabaseSVG = ({ className, style }) => (
+// Type definition for SVG props
+interface SVGComponentProps {
+  className?: string;
+  style?: CSSProperties;
+}
+interface Particle {
+  id: number;
+  x: number;
+  y: number;
+  delay: number;
+  duration: number;
+}
+
+
+// Animated Database SVG Component  
+const DatabaseSVG: React.FC<SVGComponentProps>  = ({ className, style }) => (
   <svg
     viewBox="0 0 200 200"
     className={className}
@@ -58,7 +68,7 @@ const DatabaseSVG = ({ className, style }) => (
 );
 
 // Animated Agent/AI SVG Component
-const AgentSVG = ({ className, style }) => (
+const AgentSVG: React.FC<SVGComponentProps> = ({ className, style }) => (
   <svg
     viewBox="0 0 200 200"
     className={className}
@@ -100,7 +110,7 @@ const AgentSVG = ({ className, style }) => (
 
 // Floating particles component
 const FloatingParticles = () => {
-  const [particles, setParticles] = useState([]);
+const [particles, setParticles] = useState<Particle[]>([]);
   
   useEffect(() => {
     const newParticles = Array.from({ length: 20 }, (_, i) => ({
@@ -283,7 +293,7 @@ export default function LandingPage() {
               🚀 Key Features
             </Badge>
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6">
-              What We're Building
+              What We&apos;re Building
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
               The future of database interaction - chat-driven analysis and dashboard creation
@@ -437,7 +447,7 @@ export default function LandingPage() {
                   <MessageCircle className="w-8 h-8 text-white group-hover:animate-pulse" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">💬 Chat with Database</h3>
-                <p className="text-gray-600 dark:text-gray-300">"Show me user growth trends" → Instant charts and insights</p>
+                <p className="text-gray-600 dark:text-gray-300">&quot;Show me user growth trends&quot; → Instant charts and insights</p>
               </div>
               
               <div className="text-center group hover:scale-105 transform transition-all duration-300">
@@ -445,7 +455,7 @@ export default function LandingPage() {
                   <BarChart3 className="w-8 h-8 text-white group-hover:animate-pulse" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">📊 Create Dashboards</h3>
-                <p className="text-gray-600 dark:text-gray-300">"Build a sales dashboard" → Interactive analytics in seconds</p>
+                <p className="text-gray-600 dark:text-gray-300">&quot;Build a sales dashboard&quot; → Interactive analytics in seconds</p>
               </div>
               
               <div className="text-center group hover:scale-105 transform transition-all duration-300">

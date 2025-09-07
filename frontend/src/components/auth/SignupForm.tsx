@@ -3,11 +3,10 @@
 import React, { useState } from 'react';
 
 interface SignupFormProps {
-  onSubmit?: (data: { 
-    username: string; 
-    email: string; 
-    password: string; 
-    confirmPassword: string;
+  onSubmit?: (data: {
+    username: string;
+    email: string;
+    password: string;
   }) => void;
   onSwitchToLogin?: () => void;
   isLoading?: boolean;
@@ -21,30 +20,30 @@ export default function SignupForm({ onSubmit, onSwitchToLogin, isLoading = fals
     confirmPassword: '',
     agreeToTerms: false,
   });
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
-    
+
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     }));
-    
+
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
-        [name]: ''
+        [name]: '',
       }));
     }
   };
 
   const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
+    const newErrors: Record<string, string> = {};
 
     if (!formData.username.trim()) {
       newErrors.username = 'Username is required';
@@ -85,8 +84,8 @@ export default function SignupForm({ onSubmit, onSwitchToLogin, isLoading = fals
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      const { confirmPassword, agreeToTerms, ...submitData } = formData;
-      onSubmit?.(submitData);
+      const { username, email, password } = formData;
+      onSubmit?.({ username, email, password });
     }
   };
 
@@ -122,9 +121,8 @@ export default function SignupForm({ onSubmit, onSwitchToLogin, isLoading = fals
                   autoComplete="username"
                   value={formData.username}
                   onChange={handleChange}
-                  className={`appearance-none relative block w-full px-4 py-3 border ${
-                    errors.username ? 'border-red-300' : 'border-gray-300'
-                  } placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors`}
+                  className={`appearance-none relative block w-full px-4 py-3 border ${errors.username ? 'border-red-300' : 'border-gray-300'
+                    } placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors`}
                   placeholder="Enter your username"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
@@ -151,9 +149,8 @@ export default function SignupForm({ onSubmit, onSwitchToLogin, isLoading = fals
                   autoComplete="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className={`appearance-none relative block w-full px-4 py-3 border ${
-                    errors.email ? 'border-red-300' : 'border-gray-300'
-                  } placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors`}
+                  className={`appearance-none relative block w-full px-4 py-3 border ${errors.email ? 'border-red-300' : 'border-gray-300'
+                    } placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors`}
                   placeholder="Enter your email"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
@@ -180,9 +177,8 @@ export default function SignupForm({ onSubmit, onSwitchToLogin, isLoading = fals
                   autoComplete="new-password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`appearance-none relative block w-full px-4 py-3 border ${
-                    errors.password ? 'border-red-300' : 'border-gray-300'
-                  } placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors pr-10`}
+                  className={`appearance-none relative block w-full px-4 py-3 border ${errors.password ? 'border-red-300' : 'border-gray-300'
+                    } placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors pr-10`}
                   placeholder="Create a strong password"
                 />
                 <button
@@ -220,9 +216,8 @@ export default function SignupForm({ onSubmit, onSwitchToLogin, isLoading = fals
                   autoComplete="new-password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className={`appearance-none relative block w-full px-4 py-3 border ${
-                    errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
-                  } placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors pr-10`}
+                  className={`appearance-none relative block w-full px-4 py-3 border ${errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
+                    } placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors pr-10`}
                   placeholder="Confirm your password"
                 />
                 <button
@@ -314,18 +309,18 @@ export default function SignupForm({ onSubmit, onSwitchToLogin, isLoading = fals
 
           {/* Admin Approval Notice */}
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-            <div className="flex items-start">
-              <svg className="w-5 h-5 text-yellow-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-              <div>
-                <p className="text-sm font-medium text-yellow-800">Account Approval Required</p>
-                <p className="text-xs text-yellow-600 mt-1">
-                  Your account will be reviewed by an administrator before you can access the system. You'll receive an email notification once approved.
-                </p>
-              </div>
+          <div className="flex items-start">
+            <svg className="w-5 h-5 text-yellow-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-yellow-800">Account Approval Required</p>
+              <p className="text-xs text-yellow-600 mt-1">
+                Your account will be reviewed by an administrator before you can access the system. You&apos;ll receive an email notification once approved.
+              </p>
             </div>
           </div>
+        </div>
         </form>
       </div>
     </div>
