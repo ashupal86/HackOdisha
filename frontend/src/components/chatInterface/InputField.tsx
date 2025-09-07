@@ -14,8 +14,10 @@ interface Command {
 }
 
 export function InputField({ input, handleInputChange, handleSubmit, isLoading }: InputFieldProps) {
+  console.log(input)
   const [showCommands, setShowCommands] = useState(false);
   const [selectedCommand, setSelectedCommand] = useState(0);
+  const [selectedCommandCard, setSelectedCommandCard] = useState<Command | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Available commands for autocomplete
@@ -43,7 +45,13 @@ export function InputField({ input, handleInputChange, handleSubmit, isLoading }
   const handleInputChangeWithCommands = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleInputChange(e);
     const value = e.target.value;
-    setShowCommands(value.startsWith('/'));
+    
+    // Only remove command card if user starts typing a new command (starts with '/')
+    if (value.startsWith('/') && selectedCommandCard) {
+      setSelectedCommandCard(null);
+    }
+    
+    setShowCommands(value.startsWith('/') && !selectedCommandCard);
     setSelectedCommand(0);
   };
 
@@ -69,14 +77,60 @@ export function InputField({ input, handleInputChange, handleSubmit, isLoading }
     }
   };
 
-  // Execute command by setting input value
+  // Execute command by showing it as a card
   const executeCommand = (command: Command) => {
     setShowCommands(false);
-    // Set the command as input value
+    setSelectedCommandCard(command);
+    // Clear the input field when a command is selected
     const syntheticEvent = {
-      target: { value: command.command }
+      target: { value: '' }
     } as React.ChangeEvent<HTMLInputElement>;
     handleInputChange(syntheticEvent);
+  };
+
+  // Remove command card
+  const removeCommandCard = () => {
+    setSelectedCommandCard(null);
+  };
+
+  // Modify the submit handler to include command if present
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
+    if (selectedCommandCard) {
+      // Create a synthetic event with the command and input combined
+      const combinedInput = selectedCommandCard.command + (input.trim() ? ' ' + input.trim() : '');
+      
+      // Create a new form event with the combined input
+      const formEvent = {
+        ...e,
+        target: {
+          ...e.target,
+          elements: {
+            0: { value: combinedInput }
+          }
+        }
+      } as React.FormEvent<HTMLFormElement>;
+      
+      // Temporarily update the input to include the command
+      const syntheticEvent = {
+        target: { value: combinedInput }
+      } as React.ChangeEvent<HTMLInputElement>;
+      handleInputChange(syntheticEvent);
+      
+      // Submit immediately and clear the command card
+      setTimeout(() => {
+        handleSubmit(formEvent);
+        setSelectedCommandCard(null);
+        // Clear the input after submission
+        const clearEvent = {
+          target: { value: '' }
+        } as React.ChangeEvent<HTMLInputElement>;
+        handleInputChange(clearEvent);
+      }, 0);
+    } else {
+      handleSubmit(e);
+    }
   };
 
   // Hide commands when clicking outside
@@ -88,11 +142,53 @@ export function InputField({ input, handleInputChange, handleSubmit, isLoading }
 
   return (
     <div className="border-t border-gray-100 bg-white px-6 py-5">
-      <form onSubmit={handleSubmit} className="relative">
+      <form onSubmit={handleFormSubmit} className="relative">
         <div className="flex items-center space-x-4">
           <div className="flex-1 relative">
+            {/* Selected Command Card */}
+            {selectedCommandCard && (
+              <div className="mb-3">
+                <div className="inline-flex items-center bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg px-3 py-2 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-shrink-0">
+                      {selectedCommandCard.command === '/dashboard' && (
+                        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      )}
+                      {selectedCommandCard.command === '/analytics' && (
+                        <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      )}
+                      {selectedCommandCard.command === '/help' && (
+                        <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="font-mono font-medium text-gray-700">
+                      {selectedCommandCard.command}
+                    </span>
+                    <span className="text-gray-500 text-xs">
+                      {selectedCommandCard.description}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeCommandCard}
+                    className="ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Command Suggestions Dropdown - positioned above input */}
-            {showCommands && filteredCommands.length > 0 && (
+            {showCommands && filteredCommands.length > 0 && !selectedCommandCard && (
               <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-64 overflow-y-auto">
                 <div className="p-2">
                   <div className="text-xs font-medium text-gray-500 mb-2 px-3 py-1">
@@ -149,7 +245,7 @@ export function InputField({ input, handleInputChange, handleSubmit, isLoading }
               value={input}
               onChange={handleInputChangeWithCommands}
               onKeyDown={handleKeyDown}
-              placeholder="Ask me anything about your database or type / for commands..."
+              placeholder={selectedCommandCard ? "Add additional context or parameters..." : "Ask me anything about your database or type / for commands..."}
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 text-gray-900 placeholder-gray-500 transition-all duration-200"
               disabled={isLoading}
             />
@@ -158,7 +254,7 @@ export function InputField({ input, handleInputChange, handleSubmit, isLoading }
           {/* Send button */}
           <button
             type="submit"
-            disabled={isLoading || !input.trim()}
+            disabled={isLoading || (!input.trim() && !selectedCommandCard)}
             className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl transition-colors duration-200 flex items-center space-x-2 font-medium"
           >
             {isLoading ? (
