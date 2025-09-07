@@ -1,5 +1,6 @@
 import { Message } from 'ai/react';
 import { AnalyticsRenderer } from './AnalyticsRenderer';
+import Markdown from 'react-markdown';
 
 interface ChatMessageProps {
   message: Message;
@@ -68,7 +69,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
           {isUser ? 'You' : 'AI Assistant'}
         </div>
         <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+          <Markdown>
+
           {message.content}
+          </Markdown>
         </div>
       </div>
     </div>

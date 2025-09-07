@@ -33,7 +33,6 @@ export function ChatInterface() {
 
   // Wrapper for handleSubmit
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
 
     if (!currentUser?.is_approved || currentUser.account_status !== 'active') {
       toast.error('Your account is not approved by admin. Queries are disabled.');
