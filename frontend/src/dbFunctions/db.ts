@@ -144,22 +144,6 @@ export async function checkTableExists(tableName: string): Promise<boolean> {
   }
 }
 
-export async function createProductsTableIfNotExists(): Promise<void> {
-  const exists = await checkTableExists('products');
-  if (!exists) {
-    await executeDbQuery(`
-      CREATE TABLE products (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        quantity INTEGER NOT NULL DEFAULT 0,
-        price DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-  }
-}
-
 // New functions for dynamic schema fetching
 export async function getAllTables(): Promise<DatabaseResult<TableInfo[]>> {
   try {

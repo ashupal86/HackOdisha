@@ -147,8 +147,15 @@ export function UserProfile({ currentUser, onLogout }: UserProfileProps) {
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-600">Database Access</span>
-              <span className={`font-medium ${currentUser.is_accessible ? 'text-green-600' : 'text-red-600'}`}>
-                {currentUser.is_accessible ? 'Granted' : 'Restricted'}
+              <span className={`font-medium ${
+                currentUser.is_approved 
+                  ? (currentUser.is_accessible ? 'text-green-600' : 'text-red-600')
+                  : (currentUser.is_active ? 'text-yellow-600' : 'text-red-600')
+              }`}>
+                {currentUser.is_approved 
+                  ? (currentUser.is_accessible ? 'Granted' : 'Restricted')
+                  : (currentUser.is_active ? 'Read Only' : 'Restricted')
+                }
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
@@ -159,8 +166,8 @@ export function UserProfile({ currentUser, onLogout }: UserProfileProps) {
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-600">Admin Approved</span>
-              <span className={`font-medium ${currentUser.is_approved ? 'text-green-600' : 'text-yellow-600'}`}>
-                {currentUser.is_approved ? 'Yes' : 'Pending'}
+              <span className={`font-medium ${currentUser.is_approved ? 'text-green-600' : 'text-red-600'}`}>
+                {currentUser.is_approved ? 'Yes' : 'No'}
               </span>
             </div>
           </div>

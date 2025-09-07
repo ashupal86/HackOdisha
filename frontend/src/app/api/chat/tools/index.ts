@@ -2,7 +2,35 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { google } from '@ai-sdk/google';
 import { generateText } from 'ai';
-import { executeDbQuery, createProductsTableIfNotExists,getFullDatabaseSchema,getForeignKeys } from '@/dbFunctions/db';
+import { executeDbQuery, getFullDatabaseSchema, getForeignKeys, checkTableExists } from '@/dbFunctions/db';
+
+// Type definitions for better type safety
+interface ColumnAnalysis {
+    dataType: string;
+    nonNullCount: number;
+    nullCount: number;
+    nullPercentage: string;
+    min?: number;
+    max?: number;
+    average?: number;
+    median?: number;
+    sum?: number;
+    uniqueCount?: number;
+    topValues?: Array<{ value: string; count: number }>;
+}
+
+interface Analysis {
+    summary: {
+        tableName: string;
+        totalRecords: number;
+        columnsCount: number;
+        columns: string[];
+        sampleSize: number;
+        analysisType: string;
+    };
+    columnAnalysis: Record<string, ColumnAnalysis>;
+    insights: string[];
+}
 
 // New tool for fetching database schema
 export const fetchDatabaseSchema = tool({
@@ -28,14 +56,14 @@ export const fetchDatabaseSchema = tool({
             console.table({
                 success: true,
                 schema: schemaResult.schema,
-                foreignKeys: foreignKeysResult.success ? foreignKeysResult.foreignKeys : [],
+                foreignKeys: foreignKeysResult.success ? foreignKeysResult.data : [],
                 tableCount: schemaResult.tableCount,
                 timestamp: new Date().toISOString()
             })
             return {
                 success: true,
                 schema: schemaResult.schema,
-                foreignKeys: foreignKeysResult.success ? foreignKeysResult.foreignKeys : [],
+                foreignKeys: foreignKeysResult.success ? foreignKeysResult.data : [],
                 tableCount: schemaResult.tableCount,
                 timestamp: new Date().toISOString()
             };
@@ -115,28 +143,65 @@ export const generateSafeQuery = tool({
             schema: z.record(z.any()),
             foreignKeys: z.array(z.object({
                 table_name: z.string(),
-                constraint_name: z.string(),
                 column_name: z.string(),
                 foreign_table_name: z.string(),
                 foreign_column_name: z.string()
             })),
             tableCount: z.number()
-        }).describe('The current database schema with tables, columns, and relationships'),
+        }).optional().describe('The current database schema with tables, columns, and relationships. If not provided, will be fetched automatically.'),
     }),
     execute: async ({ request, databaseSchema }) => {
         console.log("Generating safe query based on dynamic schema.................")
         try {
+            let schemaToUse = databaseSchema;
+
+            // If no schema provided or schema is empty, fetch it automatically
+            if (!schemaToUse || !schemaToUse.schema || Object.keys(schemaToUse.schema).length === 0) {
+                console.log("No schema provided, fetching database schema automatically...");
+                
+                const [schemaResult, foreignKeysResult] = await Promise.all([
+                    getFullDatabaseSchema(),
+                    getForeignKeys()
+                ]);
+
+                if (!schemaResult.success) {
+                    return {
+                        success: false,
+                        error: `Failed to fetch database schema: ${schemaResult.error}`,
+                        originalRequest: request
+                    };
+                }
+
+                schemaToUse = {
+                    schema: schemaResult.schema || {},
+                    foreignKeys: foreignKeysResult.success ? foreignKeysResult.data || [] : [],
+                    tableCount: schemaResult.tableCount || 0
+                };
+
+                console.log(`Auto-fetched schema for ${schemaToUse.tableCount} tables`);
+            }
+
+            // Validate that we now have a proper schema
+            if (!schemaToUse.schema || Object.keys(schemaToUse.schema).length === 0) {
+                return {
+                    success: false,
+                    error: 'No tables found in the database schema. Please ensure the database has tables.',
+                    originalRequest: request
+                };
+            }
+
             // Format the schema information for the LLM
-            const schemaInfo = Object.entries(databaseSchema.schema).map(([tableName, tableInfo]: [string, any]) => {
-                const columns = tableInfo.columns.map((col: any) =>
+            const schemaInfo = Object.entries(schemaToUse.schema).map(([tableName, tableInfo]) => {
+                const typedTableInfo = tableInfo as { columns: Array<{ column_name: string; data_type: string; character_maximum_length?: number; is_nullable: string; column_default?: string }> };
+                const columns = typedTableInfo.columns.map((col) =>
                     `${col.column_name} (${col.data_type}${col.character_maximum_length ? `(${col.character_maximum_length})` : ''}${col.is_nullable === 'NO' ? ' NOT NULL' : ''}${col.column_default ? ` DEFAULT ${col.column_default}` : ''})`
                 ).join(', ');
 
                 return `Table: ${tableName}\nColumns: ${columns}`;
             }).join('\n\n');
 
-            const foreignKeyInfo = databaseSchema.foreignKeys.length > 0
-                ? databaseSchema.foreignKeys.map((fk: any) =>
+            const foreignKeyInfo = schemaToUse.foreignKeys && schemaToUse.foreignKeys.length > 0
+                ? schemaToUse.foreignKeys.map((fk) =>
                     `${fk.table_name}.${fk.column_name} -> ${fk.foreign_table_name}.${fk.foreign_column_name}`
                 ).join('\n')
                 : 'No foreign key relationships';
@@ -184,7 +249,8 @@ SQL Query:`;
                 originalRequest: request,
                 targetTable,
                 usedSchema: true,
-                availableTables: Object.keys(databaseSchema.schema)
+                availableTables: Object.keys(schemaToUse.schema),
+                autoFetchedSchema: !databaseSchema || !databaseSchema.schema || Object.keys(databaseSchema.schema).length === 0
             };
         } catch (error) {
             return {
@@ -202,13 +268,23 @@ export const executeQuery = tool({
     parameters: z.object({
         query: z.string().describe('The SQL query to execute'),
         queryType: z.string().describe('Type of query (INSERT, SELECT, UPDATE, etc.)'),
+        targetTable: z.string().optional().describe('The target table for the operation'),
     }),
-    execute: async ({ query, queryType }) => {
+    execute: async ({ query, queryType, targetTable }) => {
         console.log("Executing database query.................")
         try {
-            // Ensure products table exists for INSERT operations (fallback for compatibility)
-            if (queryType.toUpperCase() === 'INSERT' && query.toLowerCase().includes('products')) {
-                await createProductsTableIfNotExists();
+            // Check if target table exists for INSERT/UPDATE operations
+            if (targetTable && (queryType.toUpperCase() === 'INSERT' || queryType.toUpperCase() === 'UPDATE')) {
+                const tableExists = await checkTableExists(targetTable);
+                if (!tableExists) {
+                    return {
+                        success: false,
+                        error: `Table '${targetTable}' does not exist. Please check available tables or create the table first.`,
+                        query,
+                        timestamp: new Date().toISOString(),
+                        suggestion: "Use the schema tool to see available tables in the database."
+                    };
+                }
             }
 
             console.log(`Executing ${queryType} query on PostgreSQL:`, query);
@@ -228,20 +304,20 @@ export const executeQuery = tool({
                 return {
                     success: true,
                     result: {
-                        insertId: result.rows[0]?.id || 'Generated',
-                        affectedRows: result.rowCount || 1,
-                        command: result.command
+                        insertId: result.data?.rows[0]?.id || 'Generated',
+                        affectedRows: result.data?.rowCount || 1,
+                        command: result.data?.command
                     },
-                    message: `Successfully inserted ${result.rowCount || 1} record(s) into the database.`,
+                    message: `Successfully inserted ${result.data?.rowCount || 1} record(s) into the database.`,
                     query,
                     timestamp: new Date().toISOString()
                 };
             } else if (queryType.toUpperCase() === 'SELECT') {
                 return {
                     success: true,
-                    result: result.rows,
-                    message: `Query executed successfully. Retrieved ${result.rowCount || 0} records.`,
-                    rowCount: result.rowCount,
+                    result: result.data?.rows,
+                    message: `Query executed successfully. Retrieved ${result.data?.rowCount || 0} records.`,
+                    rowCount: result.data?.rowCount,
                     query,
                     timestamp: new Date().toISOString()
                 };
@@ -249,10 +325,10 @@ export const executeQuery = tool({
                 return {
                     success: true,
                     result: {
-                        affectedRows: result.rowCount || 0,
-                        command: result.command
+                        affectedRows: result.data?.rowCount || 0,
+                        command: result.data?.command
                     },
-                    message: `Successfully updated ${result.rowCount || 0} record(s) in the database.`,
+                    message: `Successfully updated ${result.data?.rowCount || 0} record(s) in the database.`,
                     query,
                     timestamp: new Date().toISOString()
                 };
@@ -261,8 +337,8 @@ export const executeQuery = tool({
             return {
                 success: true,
                 result: {
-                    rowCount: result.rowCount,
-                    command: result.command
+                    rowCount: result.data?.rowCount,
+                    command: result.data?.command
                 },
                 message: 'Operation completed successfully',
                 query,
@@ -372,8 +448,8 @@ export const generateAnalyticsReport = tool({
                 };
             }
 
-            const data = dataResult.rows;
-            const totalRecords = data.length;
+            const data = dataResult.data?.rows;
+            const totalRecords = data?.length || 0;
 
             if (totalRecords === 0) {
                 return {
@@ -389,16 +465,25 @@ export const generateAnalyticsReport = tool({
                 };
             }
 
+            if (!data) {
+                return {
+                    success: false,
+                    error: 'No data returned from query'
+                };
+            }
+
             // Get table count (more accurate than LIMIT)
             const countQuery = `SELECT COUNT(*) as total FROM ${tableName}`;
             const countResult = await executeDbQuery(countQuery);
-            const actualTotal = countResult.success ? parseInt(countResult.rows[0].total) : totalRecords;
+            const actualTotal = countResult.success && countResult.data?.rows[0] 
+                ? parseInt(String(countResult.data.rows[0].total))
+                : totalRecords;
 
             // Get column information
             const columns = Object.keys(data[0]);
             
             // Generate basic statistics
-            const analysis: any = {
+            const analysis: Analysis = {
                 summary: {
                     tableName,
                     totalRecords: actualTotal,
@@ -443,8 +528,9 @@ export const generateAnalyticsReport = tool({
                     }
                 } else if (typeof columnData[0] === 'string') {
                     const uniqueValues = [...new Set(columnData)];
-                    const valueCounts = columnData.reduce((acc: any, val) => {
-                        acc[val] = (acc[val] || 0) + 1;
+                    const valueCounts = columnData.reduce((acc: Record<string, number>, val) => {
+                        const key = String(val);
+                        acc[key] = (acc[key] || 0) + 1;
                         return acc;
                     }, {});
                     
@@ -452,7 +538,7 @@ export const generateAnalyticsReport = tool({
                         ...analysis.columnAnalysis[column],
                         uniqueCount: uniqueValues.length,
                         topValues: Object.entries(valueCounts)
-                            .sort(([,a], [,b]) => (b as number) - (a as number))
+                            .sort(([,a], [,b]) => b - a)
                             .slice(0, 5)
                             .map(([value, count]) => ({ value, count }))
                     };
@@ -463,7 +549,7 @@ export const generateAnalyticsReport = tool({
             analysis.insights = [
                 `Table contains ${actualTotal} total records across ${columns.length} columns`,
                 `Data types: ${Object.entries(analysis.columnAnalysis)
-                    .map(([col, info]: [string, any]) => `${col} (${info.dataType})`)
+                    .map(([col, info]) => `${col} (${info.dataType})`)
                     .join(', ')}`,
                 `Completeness: ${columns.map(col => {
                     const colAnalysis = analysis.columnAnalysis[col];
@@ -473,8 +559,8 @@ export const generateAnalyticsReport = tool({
 
             // Add numerical insights
             const numericColumns = Object.entries(analysis.columnAnalysis)
-                .filter(([_, info]: [string, any]) => info.dataType === 'number')
-                .map(([col, _]) => col);
+                .filter(([, info]) => info.dataType === 'number')
+                .map(([col]) => col);
             
             if (numericColumns.length > 0) {
                 analysis.insights.push(`Numeric columns (${numericColumns.length}): ${numericColumns.join(', ')}`);
@@ -541,44 +627,47 @@ export const displayAnalytics = tool({
             markdown += `| Column | Data Type | Non-Null | Null % | Additional Info |\n`;
             markdown += `|--------|-----------|----------|--------|----------------|\n`;
             
-            Object.entries(analysis.columnAnalysis).forEach(([column, info]: [string, any]) => {
+            Object.entries(analysis.columnAnalysis).forEach(([column, info]) => {
+                const typedInfo = info as ColumnAnalysis;
                 let additionalInfo = '';
                 
-                if (info.dataType === 'number') {
-                    additionalInfo = `Min: ${info.min}, Max: ${info.max}, Avg: ${info.average}`;
-                } else if (info.dataType === 'string') {
-                    additionalInfo = `Unique: ${info.uniqueCount}`;
+                if (typedInfo.dataType === 'number') {
+                    additionalInfo = `Min: ${typedInfo.min}, Max: ${typedInfo.max}, Avg: ${typedInfo.average}`;
+                } else if (typedInfo.dataType === 'string') {
+                    additionalInfo = `Unique: ${typedInfo.uniqueCount}`;
                 }
                 
-                markdown += `| **${column}** | ${info.dataType} | ${info.nonNullCount} | ${info.nullPercentage}% | ${additionalInfo} |\n`;
+                markdown += `| **${column}** | ${typedInfo.dataType} | ${typedInfo.nonNullCount} | ${typedInfo.nullPercentage}% | ${additionalInfo} |\n`;
             });
 
             // Detailed Statistics for Numeric Columns
             const numericColumns = Object.entries(analysis.columnAnalysis)
-                .filter(([_, info]: [string, any]) => info.dataType === 'number');
+                .filter(([, info]) => (info as ColumnAnalysis).dataType === 'number');
             
             if (numericColumns.length > 0) {
                 markdown += `\n## 📈 Numeric Column Statistics\n\n`;
                 markdown += `| Column | Min | Max | Average | Median | Sum |\n`;
                 markdown += `|--------|-----|-----|---------|--------|----- |\n`;
                 
-                numericColumns.forEach(([column, info]: [string, any]) => {
-                    markdown += `| **${column}** | ${info.min} | ${info.max} | ${info.average} | ${info.median} | ${info.sum} |\n`;
+                numericColumns.forEach(([column, info]) => {
+                    const typedInfo = info as ColumnAnalysis;
+                    markdown += `| **${column}** | ${typedInfo.min} | ${typedInfo.max} | ${typedInfo.average} | ${typedInfo.median} | ${typedInfo.sum} |\n`;
                 });
             }
 
             // Top Values for String Columns
             const stringColumns = Object.entries(analysis.columnAnalysis)
-                .filter(([_, info]: [string, any]) => info.dataType === 'string' && info.topValues);
+                .filter(([, info]) => (info as ColumnAnalysis).dataType === 'string' && (info as ColumnAnalysis).topValues);
             
             if (stringColumns.length > 0) {
                 markdown += `\n## 🏷️ Top Values in Text Columns\n\n`;
                 
-                stringColumns.forEach(([column, info]: [string, any]) => {
+                stringColumns.forEach(([column, info]) => {
+                    const typedInfo = info as ColumnAnalysis;
                     markdown += `### ${column}\n`;
                     markdown += `| Value | Count |\n`;
                     markdown += `|-------|-------|\n`;
-                    info.topValues.forEach((item: any) => {
+                    typedInfo.topValues?.forEach((item) => {
                         markdown += `| ${item.value} | ${item.count} |\n`;
                     });
                     markdown += `\n`;
