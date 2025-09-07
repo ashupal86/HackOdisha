@@ -28,28 +28,25 @@ export default function LoginPage() {
         }
       );
 
-      console.log('First backend token:', resp.data.user.id);
+      try {
+        const logResp = await axios.post<{ access_token: string }>(
+          `${process.env.NEXT_PUBLIC_LOG_API_URL as string}/login`,
+          { user_id: resp.data.user.id }
+        );
 
-      // After login, call log API
-      const logResp = await axios.post<{ access_token: string }>(
-        `${process.env.NEXT_PUBLIC_LOG_API_URL as string}/login`,
-        { user_id: resp.data.user.id }
-      );
+        const logToken = logResp.data.access_token;
+        console.log('Second backend token:', logToken);
 
-      const logToken = logResp.data.access_token;
-      console.log('Second backend token:', logToken);
+        AuthManager.setLogToken(logToken);
+      } catch (logErr) {
+        console.warn('Optional log API failed, but continuing login...', logErr);
+      }
 
-      // Store log token
-      AuthManager.setLogToken(logToken);
-
-      // Dismiss loading toast
       toast.dismiss(loadingToast);
 
-      // Store authentication data in session
       const authSession: AuthSession = resp.data;
       AuthManager.setAuthSession(authSession);
 
-      // Show appropriate success message based on user status
       const userStatus = authSession.user.account_status;
       const isApproved = authSession.user.is_approved;
 
@@ -64,8 +61,7 @@ export default function LoginPage() {
           icon: '🚫',
           style: { background: '#EF4444', color: '#fff' },
         });
-        // Don't redirect if blocked
-        return;
+        return; 
       } else {
         toast.success('Login successful! Redirecting to chat...', {
           icon: '🎉',
@@ -73,7 +69,6 @@ export default function LoginPage() {
         });
       }
 
-      // Show user message if available
       if (authSession.user.message) {
         setTimeout(() => {
           toast(authSession.user.message as string, {
@@ -83,7 +78,6 @@ export default function LoginPage() {
         }, 1000);
       }
 
-      // Delay redirect to show toast
       setTimeout(() => {
         router.push('/chat');
       }, 1500);
