@@ -40,16 +40,12 @@ class AdminAuthBackend(AuthenticationBackend):
                     session.commit()
                     
                     # Create token and store in session
-                    token = create_token_for_user(
-                        user_id=admin.id,
-                        username=admin.username,
-                        role=admin.role,
-                    )
+                    token = create_token_for_user(admin)
                     request.session.update({
                         "token": token,
                         "user_id": str(admin.id),
                         "username": admin.username,
-                        "role": admin.role,
+                        "role": getattr(admin, 'role', 'admin'),  # Admin role for display
                         "password_changed": admin.password_changed,
                     })
                     return True
