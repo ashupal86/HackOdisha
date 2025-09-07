@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test - HackOdisha Log API</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        #output { height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; background: #f8f9fa; font-family: monospace; }
+        input, select { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 3px; }
+        .status { padding: 5px 10px; border-radius: 3px; font-weight: bold; }
+        .connected { background: #d4edda; color: #155724; }
+        .disconnected { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 HackOdisha Log API - WebSocket Test</h1>
+        
+        <!-- Connection Status -->
+        <div class="section">
+            <h3>Connection Status</h3>
+            <span id="status" class="status disconnected">Disconnected</span>
+        </div>
+
+        <!-- WebSocket Controls -->
+        <div class="section">
+            <h3>WebSocket Controls</h3>
+            <div>
+                <label>Endpoint:</label>
+                <select id="endpoint">
+                    <option value="ws://localhost:8001/ws/logs">ws://localhost:8001/ws/logs (Live Logs)</option>
+                    <option value="ws://localhost:8001/ws/stream">ws://localhost:8001/ws/stream (Real-time Stream)</option>
+                </select>
+            </div>
+            <div>
+                <label>User ID (optional):</label>
+                <input type="text" id="userId" placeholder="e.g., test_user">
+                
+                <label>Limit:</label>
+                <input type="number" id="limit" value="50" min="1" max="1000">
+                
+                <label>Offset:</label>
+                <input type="number" id="offset" value="0" min="0">
+            </div>
+            <div>
+                <button onclick="connect()" id="connectBtn">Connect</button>
+                <button onclick="disconnect()" id="disconnectBtn" disabled>Disconnect</button>
+                <button onclick="clearOutput()">Clear Output</button>
+            </div>
+        </div>
+
+        <!-- API Testing -->
+        <div class="section">
+            <h3>Create Test Logs</h3>
+            <div>
+                <input type="text" id="token" placeholder="Auth token (get from login)" style="width: 300px;">
+                <button onclick="login()">Login as test_user</button>
+            </div>
+            <div>
+                <input type="text" id="query" placeholder="SQL Query" value="SELECT * FROM test_table">
+                <select id="status">
+                    <option value="SUCCESS">SUCCESS</option>
+                    <option value="ERROR">ERROR</option>
+                    <option value="WARNING">WARNING</option>
+                </select>
+                <button onclick="createLog()">Create Log</button>
+            </div>
+        </div>
+
+        <!-- Output -->
+        <div class="section">
+            <h3>WebSocket Messages</h3>
+            <div id="output"></div>
+        </div>
+    </div>
+
+    <script>
+        let websocket = null;
+        let messageCount = 0;
+
+        function updateStatus(connected) {
+            const status = document.getElementById('status');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            
+            if (connected) {
+                status.textContent = 'Connected';
+                status.className = 'status connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else {
+                status.textContent = 'Disconnected';
+                status.className = 'status disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+            }
+        }
+
+        function addMessage(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                info: '#007bff',
+                success: '#28a745',
+                error: '#dc3545',
+                warning: '#ffc107'
+            };
+            
+            messageCount++;
+            output.innerHTML += `
+                <div style="color: ${colors[type]}; margin: 5px 0;">
+                    <strong>[${timestamp}] #${messageCount}:</strong> ${message}
+                </div>
+            `;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function connect() {
+            const endpoint = document.getElementById('endpoint').value;
+            const userId = document.getElementById('userId').value;
+            const limit = document.getElementById('limit').value;
+            const offset = document.getElementById('offset').value;
+            
+            let url = endpoint;
+            const params = new URLSearchParams();
+            
+            if (userId) params.append('user_id', userId);
+            if (endpoint.includes('/ws/logs')) {
+                if (limit) params.append('limit', limit);
+                if (offset) params.append('offset', offset);
+            }
+            
+            if (params.toString()) {
+                url += '?' + params.toString();
+            }
+            
+            addMessage(`Connecting to: ${url}`, 'info');
+            
+            websocket = new WebSocket(url);
+            
+            websocket.onopen = function(event) {
+                addMessage('✅ WebSocket connection established!', 'success');
+                updateStatus(true);
+            };
+            
+            websocket.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    const type = data.type || 'unknown';
+                    
+                    if (type === 'logs_response') {
+                        addMessage(`📋 Initial logs received: ${data.count} logs`, 'success');
+                        if (data.logs && data.logs.length > 0) {
+                            addMessage(`   Latest: ${data.logs[0].query.substring(0, 50)}...`, 'info');
+                        }
+                    } else if (type === 'heartbeat') {
+                        addMessage(`💓 Heartbeat: ${data.active_connections} active connections`, 'info');
+                    } else if (type === 'initial_logs') {
+                        addMessage(`📋 Initial batch: ${data.count} logs`, 'success');
+                    } else if (data.query) {
+                        addMessage(`📨 New log: ${data.query.substring(0, 50)}... [${data.status}]`, 'warning');
+                    } else {
+                        addMessage(`📨 Message: ${JSON.stringify(data)}`, 'info');
+                    }
+                } catch (e) {
+                    addMessage(`📨 Raw message: ${event.data}`, 'info');
+                }
+            };
+            
+            websocket.onclose = function(event) {
+                addMessage(`🔌 WebSocket connection closed (code: ${event.code})`, 'warning');
+                updateStatus(false);
+            };
+            
+            websocket.onerror = function(error) {
+                addMessage(`❌ WebSocket error: ${error}`, 'error');
+                updateStatus(false);
+            };
+        }
+
+        function disconnect() {
+            if (websocket) {
+                websocket.close();
+                websocket = null;
+            }
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = '';
+            messageCount = 0;
+        }
+
+        async function login() {
+            try {
+                const response = await fetch('http://localhost:8001/api/v1/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: 'test_user' })
+                });
+                
+                const data = await response.json();
+                document.getElementById('token').value = data.access_token;
+                addMessage(`🔑 Login successful! Token: ${data.access_token.substring(0, 20)}...`, 'success');
+            } catch (error) {
+                addMessage(`❌ Login failed: ${error}`, 'error');
+            }
+        }
+
+        async function createLog() {
+            const token = document.getElementById('token').value;
+            const query = document.getElementById('query').value;
+            const status = document.getElementById('status').value;
+            
+            if (!token) {
+                addMessage('❌ Please login first to get a token', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:8001/api/v1/logs', {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query, status })
+                });
+                
+                const data = await response.json();
+                addMessage(`✅ Log created: ${data.id}`, 'success');
+                addMessage(`   Query: ${data.query}`, 'info');
+                addMessage(`   Hash: ${data.hash.substring(0, 20)}...`, 'info');
+            } catch (error) {
+                addMessage(`❌ Failed to create log: ${error}`, 'error');
+            }
+        }
+
+        // Initialize
+        updateStatus(false);
+    </script>
+</body>
+</html>
