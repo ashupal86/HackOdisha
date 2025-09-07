@@ -4,11 +4,15 @@
 import {useChat } from '@ai-sdk/react'
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChatMessage } from './ChatMessage';
 import { InputField } from './InputField';
 import { InteractiveTool } from './InteractiveTool';
 import ChatHeader from './ChatHeader';
 import DatabaseMonitoring from './DatabaseMonitoring';
+import { UserProfile } from './UserProfile';
+import { AuthManager, type UserData } from '@/utils/auth';
+import toast from 'react-hot-toast';
 
 export function ChatInterface() {
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
@@ -23,7 +27,34 @@ export function ChatInterface() {
   });
 
   const [interactiveTools, setInteractiveTools] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  // Check authentication and load user data on component mount
+  useEffect(() => {
+    const userData = AuthManager.getUserData();
+    
+    if (!userData || !AuthManager.isAuthenticated()) {
+      toast.error('Please log in to access the chat interface.');
+      router.push('/auth/login');
+      return;
+    }
+
+    setCurrentUser(userData);
+
+    // Show welcome message based on user status
+    if (userData.account_status === 'pending_approval') {
+      toast('Your account is pending approval. Limited functionality available.', {
+        icon: '⏳',
+        style: {
+          background: '#F59E0B',
+          color: '#fff',
+        },
+        duration: 4000,
+      });
+    }
+  }, [router]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -44,146 +75,31 @@ export function ChatInterface() {
     setInteractiveTools(prev => [...prev, newTool]);
   };
 
-  // Mock user data - in real app, this would come from your authentication context
-  const currentUser = {
-    name: "John Doe",
-    email: "john.doe@company.com",
-    role: "Database Analyst",
-    avatar: "/api/placeholder/100/100",
-    joinDate: "Jan 2024",
-    lastActive: "2 minutes ago"
+  // Handle logout
+  const handleLogout = () => {
+    AuthManager.clearAuth();
+    toast.success('Logged out successfully');
+    router.push('/auth/login');
   };
 
-  // Mock data - in real app, this would come from your API
-  const recentQueries = [
-    { id: 1, query: "SELECT * FROM users WHERE status = 'active'", status: "approved", timestamp: "2 hours ago" },
-    { id: 2, query: "UPDATE products SET price = 99.99 WHERE id = 123", status: "pending", timestamp: "5 hours ago" },
-    { id: 3, query: "SELECT COUNT(*) FROM orders WHERE date > '2024-01-01'", status: "approved", timestamp: "1 day ago" },
-  ];
+
+  // Show loading state while checking authentication
+  if (!currentUser) {
+    return (
+      <div className="flex h-full items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading chat interface...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full bg-gradient-to-br from-gray-50 to-blue-50">
       {/* Left Panel - User Details */}
       <div className="w-110 bg-white border-r border-gray-200 shadow-lg">
-        <div className="h-full flex flex-col">
-          {/* User Profile Section */}
-          <div className="p-6 border-b border-gray-100">
-            <div className="flex items-center space-x-4 mb-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-xl">
-                {currentUser.name.split(' ').map(n => n[0]).join('')}
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">{currentUser.name}</h2>
-                <p className="text-sm text-gray-600">{currentUser.role}</p>
-                <p className="text-xs text-gray-500">{currentUser.email}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-500">Joined:</span>
-                <p className="font-medium text-gray-900">{currentUser.joinDate}</p>
-              </div>
-              <div>
-                <span className="text-gray-500">Last Active:</span>
-                <p className="font-medium text-gray-900">{currentUser.lastActive}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-6">
-            {/* Safety Status */}
-            <div className="mb-6">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Safety Status</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">AI Guardrails</span>
-                  <span className="text-green-600 font-medium flex items-center">
-                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    Active
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Blockchain Logging</span>
-                  <span className="text-green-600 font-medium flex items-center">
-                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    Active
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">RBAC Enforcement</span>
-                  <span className="text-green-600 font-medium flex items-center">
-                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    Active
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Admin Oversight</span>
-                  <span className="text-green-600 font-medium flex items-center">
-                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    Active
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Interactive Tools History */}
-            {interactiveTools.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Recent Tools</h3>
-                <div className="space-y-2">
-                  {interactiveTools.slice(-3).map((tool) => (
-                    <div key={tool.id} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                      <div className="text-sm font-medium text-gray-700">{tool.command}</div>
-                      <div className="text-xs text-gray-500 mt-1">{tool.timestamp.toLocaleTimeString()}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Recent Queries */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Recent Queries</h3>
-              <div className="space-y-3">
-                {recentQueries.map((query) => (
-                  <div key={query.id} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    <div className="text-xs font-mono text-gray-700 mb-2 line-clamp-2">
-                      {query.query}
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                        query.status === 'approved' ? 'bg-green-100 text-green-800' :
-                        query.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {query.status}
-                      </span>
-                      <span className="text-xs text-gray-500">{query.timestamp}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Logout Button */}
-          <div className="p-6 border-t border-gray-100">
-            <button className="w-full bg-red-50 hover:bg-red-100 text-red-700 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
+        <UserProfile currentUser={currentUser} onLogout={handleLogout} />
       </div>
 
       {/* Center Panel - Chat Window */}

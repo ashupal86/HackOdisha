@@ -1,4 +1,4 @@
-import { ChatContainer } from '@/components/chatInterfaces';
+import { ChatContainer } from '@/components/chatInterface';
 
 export default function ChatPage() {
   return <ChatContainer />;
