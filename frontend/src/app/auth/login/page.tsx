@@ -13,31 +13,46 @@ export default function LoginPage() {
 
   const handleLogin = async (data: { username: string; password: string }) => {
     setIsLoading(true);
-    
+
     try {
       console.log('Login attempt:', data);
-      
+
       // Show loading toast
       const loadingToast = toast.loading('Signing you in...');
-      
+
       const resp = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
-        username: data.username, 
+        username: data.username,
         password: data.password
       });
-      
+
+      console.log('First backend token:', resp.data.user.id);
+
+      //after login call log api
+      const logResp = await axios.post(`${process.env.NEXT_PUBLIC_LOG_API_URL}/login`, {
+        user_id: resp.data.user.id,
+      });
+
+      const logToken = logResp.data.access_token;
+      console.log('Second backend token:', logToken);
+
+      AuthManager.setLogToken(logToken);
+
+      // Optionally store in AuthManager or localStorage if you need to use it later
+      AuthManager.setLogToken(logToken);
+
       console.log("auth resp", resp.data);
 
       // Dismiss loading toast
       toast.dismiss(loadingToast);
-      
+
       // Store authentication data in session
       const authSession: AuthSession = resp.data;
       AuthManager.setAuthSession(authSession);
-      
+
       // Show appropriate success message based on user status
       const userStatus = authSession.user.account_status;
       const isApproved = authSession.user.is_approved;
-      
+
       if (userStatus === 'pending_approval' || !isApproved) {
         toast.success('Login successful! Note: Account pending approval.', {
           icon: '⏳',
@@ -66,7 +81,7 @@ export default function LoginPage() {
           },
         });
       }
-      
+
       // Show user message if available
       if (authSession.user.message) {
         setTimeout(() => {
@@ -79,18 +94,18 @@ export default function LoginPage() {
           });
         }, 1000);
       }
-      
+
       // Delay redirect to show toast
       setTimeout(() => {
         router.push('/chat');
       }, 1500);
-      
+
     } catch (error: any) {
       console.error('Login error:', error);
-      
+
       // Handle different error scenarios
       let errorMessage = 'Login failed. Please check your credentials and try again.';
-      
+
       if (error.response?.status === 401) {
         errorMessage = 'Invalid username or password.';
       } else if (error.response?.status === 403) {
@@ -98,7 +113,7 @@ export default function LoginPage() {
       } else if (error.response?.data?.detail) {
         errorMessage = error.response.data.detail;
       }
-      
+
       toast.error(errorMessage, {
         icon: '❌',
         style: {
