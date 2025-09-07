@@ -1,6 +1,19 @@
+'use client';
+
 import React from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function LandingPage() {
+  const router = useRouter();
+
+  const handleLogin = () => {
+    router.push('/auth/login');
+  };
+
+  const handleSignup = () => {
+    router.push('/auth/signup');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       {/* Navigation */}
@@ -10,10 +23,16 @@ export default function LandingPage() {
             AI-SafeQuery
           </div>
           <div className="flex items-center space-x-4">
-            <button className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
+            <button 
+              onClick={handleLogin}
+              className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
               Login
             </button>
-            <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <button 
+              onClick={handleSignup}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
               Sign Up
             </button>
           </div>
@@ -33,7 +52,10 @@ export default function LandingPage() {
             and immutable blockchain logging.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-8 py-3 bg-blue-600 text-white rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors">
+            <button 
+              onClick={handleSignup}
+              className="px-8 py-3 bg-blue-600 text-white rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors"
+            >
               Start Querying Safely
             </button>
             <button className="px-8 py-3 border-2 border-blue-600 text-blue-600 dark:text-blue-400 rounded-lg text-lg font-semibold hover:bg-blue-50 dark:hover:bg-gray-800 transition-colors">
@@ -188,7 +210,10 @@ export default function LandingPage() {
             Join organizations using AI-SafeQuery for governance, compliance, and secure database access.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-8 py-3 bg-white text-blue-600 rounded-lg text-lg font-semibold hover:bg-gray-100 transition-colors">
+            <button 
+              onClick={handleSignup}
+              className="px-8 py-3 bg-white text-blue-600 rounded-lg text-lg font-semibold hover:bg-gray-100 transition-colors"
+            >
               Start Free Trial
             </button>
             <button className="px-8 py-3 border-2 border-white text-white rounded-lg text-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">
