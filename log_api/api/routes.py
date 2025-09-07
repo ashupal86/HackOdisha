@@ -4,7 +4,8 @@ from typing import List
 from .models import LogEntry
 from .log import LogCreate, LogResponse, LoginRequest, TokenResponse
 from .auth import get_current_user, create_session
-
+import threading
+from .blockchain_storage import store_log_on_blockchain_background
 
 router = APIRouter()
 
@@ -35,6 +36,14 @@ def create_log(
     )
     
     log_entry.save()
+    
+
+    blockchain_thread = threading.Thread(
+        target=store_log_on_blockchain_background,
+        args=(log_entry.hash,),
+        daemon=True
+    )
+    blockchain_thread.start()
     
     return LogResponse(**log_entry.to_dict())
 
