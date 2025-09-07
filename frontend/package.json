@@ -18,11 +18,14 @@
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
+    "@tanstack/react-query": "^5.87.1",
     "@types/pg": "^8.15.5",
     "ai": "4.2",
     "axios": "^1.11.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dgram": "^1.0.1",
+    "dns": "^0.2.2",
     "lucide-react": "^0.542.0",
     "next": "15.5.2",
     "openai": "^5.19.1",
@@ -31,9 +34,12 @@
     "react-dom": "19.1.0",
     "react-hot-toast": "^2.6.0",
     "react-markdown": "^10.1.0",
+    "recharts": "^3.1.2",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.3.1",
+    "tls": "^0.0.1",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
