@@ -349,3 +349,281 @@ Response:`;
         }
     },
 });
+
+// Tool for generating analytics report
+export const generateAnalyticsReport = tool({
+    description: 'Generate comprehensive analytics report by fetching actual data from specified database table',
+    parameters: z.object({
+        tableName: z.string().describe('Name of the table to analyze'),
+        analysisType: z.string().optional().describe('Type of analysis: summary, detailed, trends, etc.')
+    }),
+    execute: async ({ tableName, analysisType = 'detailed' }) => {
+        try {
+            console.log(`Generating analytics report for table: ${tableName}...`);
+            
+            // Fetch table data
+            const dataQuery = `SELECT * FROM ${tableName} LIMIT 1000`;
+            const dataResult = await executeDbQuery(dataQuery);
+            
+            if (!dataResult.success) {
+                return {
+                    success: false,
+                    error: `Failed to fetch data from table '${tableName}': ${dataResult.error}`
+                };
+            }
+
+            const data = dataResult.rows;
+            const totalRecords = data.length;
+
+            if (totalRecords === 0) {
+                return {
+                    success: true,
+                    tableName,
+                    analysis: {
+                        summary: {
+                            totalRecords: 0,
+                            message: 'No data found in the table'
+                        }
+                    },
+                    timestamp: new Date().toISOString()
+                };
+            }
+
+            // Get table count (more accurate than LIMIT)
+            const countQuery = `SELECT COUNT(*) as total FROM ${tableName}`;
+            const countResult = await executeDbQuery(countQuery);
+            const actualTotal = countResult.success ? parseInt(countResult.rows[0].total) : totalRecords;
+
+            // Get column information
+            const columns = Object.keys(data[0]);
+            
+            // Generate basic statistics
+            const analysis: any = {
+                summary: {
+                    tableName,
+                    totalRecords: actualTotal,
+                    columnsCount: columns.length,
+                    columns: columns,
+                    sampleSize: totalRecords,
+                    analysisType
+                },
+                columnAnalysis: {},
+                insights: []
+            };
+
+            // Analyze each column
+            for (const column of columns) {
+                const columnData = data.map(row => row[column]).filter(val => val !== null && val !== undefined);
+                const nonNullCount = columnData.length;
+                const nullCount = totalRecords - nonNullCount;
+                
+                analysis.columnAnalysis[column] = {
+                    dataType: typeof columnData[0],
+                    nonNullCount,
+                    nullCount,
+                    nullPercentage: ((nullCount / totalRecords) * 100).toFixed(2)
+                };
+
+                // Type-specific analysis
+                if (typeof columnData[0] === 'number') {
+                    const numbers = columnData.filter(val => typeof val === 'number');
+                    if (numbers.length > 0) {
+                        const sum = numbers.reduce((a, b) => a + b, 0);
+                        const avg = sum / numbers.length;
+                        const sorted = numbers.sort((a, b) => a - b);
+                        
+                        analysis.columnAnalysis[column] = {
+                            ...analysis.columnAnalysis[column],
+                            min: Math.min(...numbers),
+                            max: Math.max(...numbers),
+                            average: parseFloat(avg.toFixed(2)),
+                            median: sorted[Math.floor(sorted.length / 2)],
+                            sum: sum
+                        };
+                    }
+                } else if (typeof columnData[0] === 'string') {
+                    const uniqueValues = [...new Set(columnData)];
+                    const valueCounts = columnData.reduce((acc: any, val) => {
+                        acc[val] = (acc[val] || 0) + 1;
+                        return acc;
+                    }, {});
+                    
+                    analysis.columnAnalysis[column] = {
+                        ...analysis.columnAnalysis[column],
+                        uniqueCount: uniqueValues.length,
+                        topValues: Object.entries(valueCounts)
+                            .sort(([,a], [,b]) => (b as number) - (a as number))
+                            .slice(0, 5)
+                            .map(([value, count]) => ({ value, count }))
+                    };
+                }
+            }
+
+            // Generate insights
+            analysis.insights = [
+                `Table contains ${actualTotal} total records across ${columns.length} columns`,
+                `Data types: ${Object.entries(analysis.columnAnalysis)
+                    .map(([col, info]: [string, any]) => `${col} (${info.dataType})`)
+                    .join(', ')}`,
+                `Completeness: ${columns.map(col => {
+                    const colAnalysis = analysis.columnAnalysis[col];
+                    return `${col}: ${(100 - parseFloat(colAnalysis.nullPercentage)).toFixed(1)}% complete`;
+                }).join(', ')}`
+            ];
+
+            // Add numerical insights
+            const numericColumns = Object.entries(analysis.columnAnalysis)
+                .filter(([_, info]: [string, any]) => info.dataType === 'number')
+                .map(([col, _]) => col);
+            
+            if (numericColumns.length > 0) {
+                analysis.insights.push(`Numeric columns (${numericColumns.length}): ${numericColumns.join(', ')}`);
+            }
+
+            return {
+                success: true,
+                tableName,
+                analysis,
+                rawDataSample: data.slice(0, 5), // First 5 rows as sample
+                timestamp: new Date().toISOString()
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to generate analytics report',
+                tableName
+            };
+        }
+    },
+});
+
+// Tool for displaying analytics in table/markdown format
+export const displayAnalytics = tool({
+    description: 'Display analytics report in formatted table and markdown format',
+    parameters: z.object({
+        analysisData: z.object({
+            success: z.boolean(),
+            tableName: z.string(),
+            analysis: z.object({
+                summary: z.record(z.any()),
+                columnAnalysis: z.record(z.any()),
+                insights: z.array(z.string())
+            }),
+            rawDataSample: z.array(z.record(z.any())).optional()
+        }).describe('The analysis data to format and display')
+    }),
+    execute: async ({ analysisData }) => {
+        try {
+            if (!analysisData.success) {
+                return {
+                    success: false,
+                    error: 'Cannot display analytics for failed analysis'
+                };
+            }
+
+            const { tableName, analysis, rawDataSample } = analysisData;
+            
+            // Generate markdown report
+            let markdown = `# 📊 Analytics Report: ${tableName}\n\n`;
+            
+            // Summary section
+            markdown += `## 📋 Summary\n\n`;
+            markdown += `| Metric | Value |\n`;
+            markdown += `|--------|-------|\n`;
+            markdown += `| **Table Name** | ${analysis.summary.tableName} |\n`;
+            markdown += `| **Total Records** | ${analysis.summary.totalRecords.toLocaleString()} |\n`;
+            markdown += `| **Columns** | ${analysis.summary.columnsCount} |\n`;
+            markdown += `| **Sample Size** | ${analysis.summary.sampleSize} |\n`;
+            markdown += `| **Analysis Type** | ${analysis.summary.analysisType} |\n\n`;
+
+            // Column Analysis section
+            markdown += `## 🔍 Column Analysis\n\n`;
+            markdown += `| Column | Data Type | Non-Null | Null % | Additional Info |\n`;
+            markdown += `|--------|-----------|----------|--------|----------------|\n`;
+            
+            Object.entries(analysis.columnAnalysis).forEach(([column, info]: [string, any]) => {
+                let additionalInfo = '';
+                
+                if (info.dataType === 'number') {
+                    additionalInfo = `Min: ${info.min}, Max: ${info.max}, Avg: ${info.average}`;
+                } else if (info.dataType === 'string') {
+                    additionalInfo = `Unique: ${info.uniqueCount}`;
+                }
+                
+                markdown += `| **${column}** | ${info.dataType} | ${info.nonNullCount} | ${info.nullPercentage}% | ${additionalInfo} |\n`;
+            });
+
+            // Detailed Statistics for Numeric Columns
+            const numericColumns = Object.entries(analysis.columnAnalysis)
+                .filter(([_, info]: [string, any]) => info.dataType === 'number');
+            
+            if (numericColumns.length > 0) {
+                markdown += `\n## 📈 Numeric Column Statistics\n\n`;
+                markdown += `| Column | Min | Max | Average | Median | Sum |\n`;
+                markdown += `|--------|-----|-----|---------|--------|----- |\n`;
+                
+                numericColumns.forEach(([column, info]: [string, any]) => {
+                    markdown += `| **${column}** | ${info.min} | ${info.max} | ${info.average} | ${info.median} | ${info.sum} |\n`;
+                });
+            }
+
+            // Top Values for String Columns
+            const stringColumns = Object.entries(analysis.columnAnalysis)
+                .filter(([_, info]: [string, any]) => info.dataType === 'string' && info.topValues);
+            
+            if (stringColumns.length > 0) {
+                markdown += `\n## 🏷️ Top Values in Text Columns\n\n`;
+                
+                stringColumns.forEach(([column, info]: [string, any]) => {
+                    markdown += `### ${column}\n`;
+                    markdown += `| Value | Count |\n`;
+                    markdown += `|-------|-------|\n`;
+                    info.topValues.forEach((item: any) => {
+                        markdown += `| ${item.value} | ${item.count} |\n`;
+                    });
+                    markdown += `\n`;
+                });
+            }
+
+            // Data Sample section
+            if (rawDataSample && rawDataSample.length > 0) {
+                markdown += `## 📄 Data Sample (First 5 Records)\n\n`;
+                
+                const columns = Object.keys(rawDataSample[0]);
+                markdown += `| ${columns.join(' | ')} |\n`;
+                markdown += `| ${columns.map(() => '---').join(' | ')} |\n`;
+                
+                rawDataSample.forEach(row => {
+                    const values = columns.map(col => {
+                        const value = row[col];
+                        return value === null || value === undefined ? 'NULL' : String(value);
+                    });
+                    markdown += `| ${values.join(' | ')} |\n`;
+                });
+            }
+
+            // Insights section
+            markdown += `\n## 💡 Key Insights\n\n`;
+            analysis.insights.forEach((insight: string, index: number) => {
+                markdown += `${index + 1}. ${insight}\n`;
+            });
+
+            markdown += `\n---\n*Report generated on ${new Date().toLocaleString()}*\n`;
+
+            return {
+                success: true,
+                markdown,
+                tableName,
+                recordCount: analysis.summary.totalRecords,
+                columnCount: analysis.summary.columnsCount,
+                timestamp: new Date().toISOString()
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to display analytics',
+                fallbackMessage: 'Unable to format analytics report'
+            };
+        }
+    },
+});

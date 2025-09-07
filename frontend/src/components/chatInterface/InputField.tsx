@@ -6,14 +6,12 @@ interface InputFieldProps {
   handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isLoading: boolean;
-  onCommandExecuted: (command: string, content: any) => void;
   disabled?: boolean;
 }
 
 interface Command {
   command: string;
   description: string;
-  action: () => void;
 }
 
 export function InputField({
@@ -26,92 +24,22 @@ export function InputField({
 }: InputFieldProps) {
   const [showCommands, setShowCommands] = useState(false);
   const [selectedCommand, setSelectedCommand] = useState(0);
+  const [selectedCommandCard, setSelectedCommandCard] = useState<Command | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Generate dashboard content
-  const generateDashboard = () => {
-    return {
-      type: 'dashboard',
-      content: {
-        title: 'AI-SafeQuery Interactive Dashboard',
-        metrics: [
-          { label: 'Total Queries Today', value: '1,247', change: '+12%', trend: 'up' },
-          { label: 'Approval Rate', value: '94.2%', change: '+2.1%', trend: 'up' },
-          { label: 'Active Users', value: '89', change: '-3%', trend: 'down' },
-          { label: 'Blocked Queries', value: '23', change: '+5%', trend: 'up' }
-        ],
-        charts: {
-          queryTypes: [
-            { type: 'SELECT', count: 980, percentage: 78.6 },
-            { type: 'INSERT', count: 156, percentage: 12.5 },
-            { type: 'UPDATE', count: 89, percentage: 7.1 },
-            { type: 'DELETE', count: 22, percentage: 1.8 }
-          ],
-          timelineData: [
-            { time: '00:00', queries: 45 },
-            { time: '04:00', queries: 23 },
-            { time: '08:00', queries: 178 },
-            { time: '12:00', queries: 234 },
-            { time: '16:00', queries: 289 },
-            { time: '20:00', queries: 167 }
-          ]
-        },
-        recentActivity: [
-          { user: 'john.doe', action: 'executed SELECT query', status: 'approved', time: '2 min ago' },
-          { user: 'jane.smith', action: 'requested DELETE operation', status: 'pending', time: '5 min ago' },
-          { user: 'admin', action: 'approved UPDATE query', status: 'completed', time: '8 min ago' }
-        ]
-      }
-    };
-  };
-
-  // Generate analytics content
-  const generateAnalytics = () => {
-    return {
-      type: 'analytics',
-      content: {
-        title: 'Query Analytics & Performance Report',
-        performanceMetrics: [
-          { metric: 'Avg Query Time', value: '1.2s', benchmark: '< 2s', status: 'good' },
-          { metric: 'Success Rate', value: '96.8%', benchmark: '> 95%', status: 'excellent' },
-          { metric: 'Compliance Score', value: '98.1%', benchmark: '> 90%', status: 'excellent' },
-          { metric: 'Resource Usage', value: '67%', benchmark: '< 80%', status: 'good' }
-        ],
-        topQueries: [
-          { query: 'SELECT * FROM users WHERE status = "active"', count: 156, avgTime: '0.8s' },
-          { query: 'SELECT COUNT(*) FROM orders WHERE date > ?', count: 89, avgTime: '1.1s' },
-          { query: 'UPDATE user_profiles SET last_login = NOW()', count: 67, avgTime: '0.9s' }
-        ],
-        userActivity: [
-          { user: 'john.doe', queries: 45, approval_rate: '100%', risk_score: 'low' },
-          { user: 'jane.smith', queries: 32, approval_rate: '94%', risk_score: 'medium' },
-          { user: 'bob.wilson', queries: 28, approval_rate: '89%', risk_score: 'medium' }
-        ],
-        securityAlerts: [
-          { type: 'Unusual Pattern', description: 'Multiple DELETE queries from user: temp_user', severity: 'high' },
-          { type: 'Permission Escalation', description: 'User requested admin-level query', severity: 'medium' }
-        ]
-      }
-    };
-  };
-
-  // Available commands - only dashboard and analytics
+  // Available commands for autocomplete
   const commands: Command[] = [
     {
       command: '/dashboard',
-      description: 'Generate interactive dashboard with query insights and system metrics',
-      action: () => {
-        const dashboardData = generateDashboard();
-        onCommandExecuted('/dashboard', dashboardData);
-      }
+      description: 'Generate system dashboard overview with key metrics and status'
     },
     {
       command: '/analytics',
-      description: 'View analytics and reports for query patterns and performance',
-      action: () => {
-        const analyticsData = generateAnalytics();
-        onCommandExecuted('/analytics', analyticsData);
-      }
+      description: 'Generate comprehensive analytics report with performance metrics and insights'
+    },
+    {
+      command: '/help',
+      description: 'Show help information and available commands'
     }
   ];
 
@@ -120,15 +48,21 @@ export function InputField({
     cmd.command.toLowerCase().includes(input.toLowerCase()) && input.startsWith('/')
   );
 
-  // Handle input changes
+  // Handle input changes with command detection
   const handleInputChangeWithCommands = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleInputChange(e);
     const value = e.target.value;
-    setShowCommands(value.startsWith('/'));
+    
+    // Only remove command card if user starts typing a new command (starts with '/')
+    if (value.startsWith('/') && selectedCommandCard) {
+      setSelectedCommandCard(null);
+    }
+    
+    setShowCommands(value.startsWith('/') && !selectedCommandCard);
     setSelectedCommand(0);
   };
 
-  // Handle key navigation
+  // Handle key navigation for autocomplete
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (showCommands && filteredCommands.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -141,7 +75,7 @@ export function InputField({
         setSelectedCommand(prev =>
           prev > 0 ? prev - 1 : filteredCommands.length - 1
         );
-      } else if (e.key === 'Tab' || e.key === 'Enter') {
+      } else if (e.key === 'Tab' || (e.key === 'Enter' && showCommands)) {
         e.preventDefault();
         executeCommand(filteredCommands[selectedCommand]);
       } else if (e.key === 'Escape') {
@@ -150,16 +84,60 @@ export function InputField({
     }
   };
 
-  // Execute command
+  // Execute command by showing it as a card
   const executeCommand = (command: Command) => {
     setShowCommands(false);
-    // Clear input
+    setSelectedCommandCard(command);
+    // Clear the input field when a command is selected
     const syntheticEvent = {
       target: { value: '' }
     } as React.ChangeEvent<HTMLInputElement>;
     handleInputChange(syntheticEvent);
-    // Execute command action
-    command.action();
+  };
+
+  // Remove command card
+  const removeCommandCard = () => {
+    setSelectedCommandCard(null);
+  };
+
+  // Modify the submit handler to include command if present
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
+    if (selectedCommandCard) {
+      // Create a synthetic event with the command and input combined
+      const combinedInput = selectedCommandCard.command + (input.trim() ? ' ' + input.trim() : '');
+      
+      // Create a new form event with the combined input
+      const formEvent = {
+        ...e,
+        target: {
+          ...e.target,
+          elements: {
+            0: { value: combinedInput }
+          }
+        }
+      } as React.FormEvent<HTMLFormElement>;
+      
+      // Temporarily update the input to include the command
+      const syntheticEvent = {
+        target: { value: combinedInput }
+      } as React.ChangeEvent<HTMLInputElement>;
+      handleInputChange(syntheticEvent);
+      
+      // Submit immediately and clear the command card
+      setTimeout(() => {
+        handleSubmit(formEvent);
+        setSelectedCommandCard(null);
+        // Clear the input after submission
+        const clearEvent = {
+          target: { value: '' }
+        } as React.ChangeEvent<HTMLInputElement>;
+        handleInputChange(clearEvent);
+      }, 0);
+    } else {
+      handleSubmit(e);
+    }
   };
 
   // Hide commands when clicking outside
@@ -171,15 +149,57 @@ export function InputField({
 
   return (
     <div className="border-t border-gray-100 bg-white px-6 py-5">
-      <form onSubmit={handleSubmit} className="relative">
+      <form onSubmit={handleFormSubmit} className="relative">
         <div className="flex items-center space-x-4">
           <div className="flex-1 relative">
+            {/* Selected Command Card */}
+            {selectedCommandCard && (
+              <div className="mb-3">
+                <div className="inline-flex items-center bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg px-3 py-2 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-shrink-0">
+                      {selectedCommandCard.command === '/dashboard' && (
+                        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      )}
+                      {selectedCommandCard.command === '/analytics' && (
+                        <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      )}
+                      {selectedCommandCard.command === '/help' && (
+                        <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="font-mono font-medium text-gray-700">
+                      {selectedCommandCard.command}
+                    </span>
+                    <span className="text-gray-500 text-xs">
+                      {selectedCommandCard.description}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeCommandCard}
+                    className="ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Command Suggestions Dropdown - positioned above input */}
-            {showCommands && filteredCommands.length > 0 && (
+            {showCommands && filteredCommands.length > 0 && !selectedCommandCard && (
               <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-64 overflow-y-auto">
                 <div className="p-2">
                   <div className="text-xs font-medium text-gray-500 mb-2 px-3 py-1">
-                    Interactive Tools
+                    Quick Commands
                   </div>
                   {filteredCommands.map((command, index) => (
                     <button
@@ -200,7 +220,12 @@ export function InputField({
                           )}
                           {command.command === '/analytics' && (
                             <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                          )}
+                          {command.command === '/help' && (
+                            <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                           )}
                         </div>
@@ -209,7 +234,7 @@ export function InputField({
                             }`}>
                             {command.command}
                           </div>
-                          <div className="text-xs text-gray-500 mt-1 line-clamp-2">
+                          <div className="text-xs text-gray-500 truncate">
                             {command.description}
                           </div>
                         </div>
@@ -217,14 +242,12 @@ export function InputField({
                     </button>
                   ))}
                 </div>
-                <div className="border-t border-gray-100 px-3 py-2 bg-gray-50 text-xs text-gray-500 rounded-b-xl">
-                  Use ↑↓ to navigate, Enter to select, Esc to close
-                </div>
               </div>
             )}
 
             <input
               ref={inputRef}
+              type="text"
               value={input}
               onChange={handleInputChangeWithCommands}
               onKeyDown={handleKeyDown}
@@ -251,10 +274,10 @@ export function InputField({
   `}
           >
             {isLoading ? (
-              <div className="flex items-center space-x-2">
+              <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Sending...</span>
-              </div>
+                <span>Processing...</span>
+              </>
             ) : (
               <div className="flex items-center space-x-2">
                 <span>{disabled ? "Restricted" : "Send"}</span>
@@ -266,6 +289,11 @@ export function InputField({
               </div>
             )}
           </button>
+        </div>
+
+        {/* Help text */}
+        <div className="mt-3 text-xs text-gray-500 text-center">
+          Type your question in natural language, SQL queries, or use commands like <span className="font-mono bg-gray-100 px-1 rounded">/analytics</span> or <span className="font-mono bg-gray-100 px-1 rounded">/dashboard</span>
         </div>
       </form>
     </div>

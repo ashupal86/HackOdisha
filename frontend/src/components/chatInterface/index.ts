@@ -1,5 +1,10 @@
 export { ChatContainer } from './ChatContainer';
+export { ChatHeader } from './ChatHeader';
 export { ChatInterface } from './ChatInterface';
 export { ChatMessage } from './ChatMessage';
+export { DatabaseMonitoring } from './DatabaseMonitoring';
 export { InputField } from './InputField';
+export { InteractiveDashboard } from './InteractiveDashboard';
+export { InteractiveTool } from './InteractiveTool';
 export { UserProfile } from './UserProfile';
+export { AnalyticsRenderer } from './AnalyticsRenderer';
